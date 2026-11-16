@@ -99,6 +99,6 @@ Paddle code and no console command; phase 02 adds both.
 
 ### 5. Phase checks
 
-- [ ] 5.1 Run the AGENTS.md checks locally, then the suite once from a clean clone with only
+- [x] 5.1 Run the AGENTS.md checks locally, then the suite once from a clean clone with only
   `uv sync --locked` (docs/reviews/README.md). Verify: all commands exit 0; note the clean-clone
   run's commit SHA for the impl review.
