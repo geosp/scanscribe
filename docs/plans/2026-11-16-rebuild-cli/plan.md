@@ -1,6 +1,6 @@
 ---
 title: Rebuild the scanscribe CLI from the ocr-pdf prototype
-status: approved
+status: in-progress
 created: 2026-11-16
 updated: 2026-11-16
 design_review: { status: passed, rounds: 2, last: 2026-11-16 }
@@ -336,7 +336,7 @@ needs no change.
 
 | Phase | Title | Status | Tasks | Delivers |
 | --- | --- | --- | --- | --- |
-| 01 | [Page pipeline and CLI on a fake engine](phases/01-pipeline-and-cli.md) | approved | 0/12 | R1–R12, R20 |
+| 01 | [Page pipeline and CLI on a fake engine](phases/01-pipeline-and-cli.md) | in-progress | 0/12 | R1–R12, R20 |
 | 02 | [PaddleOCR adapter and the scanscribe command](phases/02-paddleocr-adapter.md) | approved | 0/8 | R13–R19 |
 
 ## Decision log

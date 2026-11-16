@@ -1,9 +1,9 @@
 ---
 phase: 1
 title: Page pipeline and CLI on a fake engine
-status: approved
-branch: null
-base: null
+status: in-progress
+branch: feat/4-pipeline-and-cli
+base: 7594141b5dcc874b13cf03c8b7b80369fbb1b80a
 delivers: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R20]
 design_review: { status: passed, rounds: 2, last: 2026-11-16 }
 impl_review: { status: none, rounds: 0, last: null }
@@ -22,7 +22,7 @@ Paddle code and no console command; phase 02 adds both.
 
 ### 1. Interface and test scaffolding
 
-- [ ] 1.1 Add `src/scanscribe/engine.py` with the `OcrEngine` protocol, the `EngineFactory` type
+- [x] 1.1 Add `src/scanscribe/engine.py` with the `OcrEngine` protocol, the `EngineFactory` type
   `(lang, device: str | None) -> OcrEngine`, and the errors `ScanscribeError`, then `UsageError` and
   `InputError` under it (D1, D7). Verify: `uv run mypy` passes.
 - [ ] 1.2 Add `tests/conftest.py` with `FakeEngine`, which names the nearest palette color, and
