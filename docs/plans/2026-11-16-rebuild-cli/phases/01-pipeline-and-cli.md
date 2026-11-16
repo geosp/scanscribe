@@ -5,7 +5,7 @@ status: draft
 branch: null
 base: null
 delivers: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R20]
-design_review: { status: changes-requested, rounds: 2, last: 2026-11-16 }
+design_review: { status: passed, rounds: 2, last: 2026-11-16 }
 impl_review: { status: none, rounds: 0, last: null }
 approved: null
 ---
@@ -27,20 +27,21 @@ Paddle code and no console command; phase 02 adds both.
   `InputError` under it (D1, D7). Verify: `uv run mypy` passes.
 - [ ] 1.2 Add `tests/conftest.py` with `FakeEngine`, which names the nearest palette color, and
   fixture builders in `tmp_path` (D9, [notes.md#d9](../notes.md#d9-fake-engine-and-fixtures)):
-  image folders, multi-page PDFs, a red-page PDF, a zero-page PDF, `notes.dat`, a corrupt image and a
-  truncated PNG. Verify: a smoke test builds each fixture; `Image.verify()` rejects the truncated
-  PNG; `git status` shows no new binary files.
+  image folders, multi-page PDFs, a red-page PDF, a zero-page PDF, `notes.dat`, a corrupt image, a
+  truncated PNG and a truncated JPEG. Verify: a smoke test builds each fixture; `Image.load()` rejects
+  both truncated images; `git status` shows no new binary files.
 
 ### 2. Page sources (`src/scanscribe/pages.py`)
 
 - [ ] 2.1 List a folder's pages: regular files only, supported extensions in any case, no dotfiles,
-  natural order with the exact name as tiebreaker. Split on `\d+` and convert only the digit parts
-  (R1). Verify: tests for `page2` before `page10`, upper-case extensions, a subfolder named `x.png`,
+  natural order: text parts case-folded, digit runs as numbers, the exact name as tiebreaker. Split on
+  `\d+` and convert only the digit parts (R1). Verify: tests for `page2` before `Page10`, upper-case extensions, a subfolder named `x.png`,
   `notes.txt`, `._page1.jpg`, and `A.png` before `a.png`.
 - [ ] 2.2 Build a page source for each input kind. Before any OCR it exposes each page's label (the
   file name, or `page N`) and checks every page (D6):
-  - images: `Image.open`, `verify()`, read the size, then close;
-  - PDFs: open once, count the pages, and read each page's width × DPI / 72;
+  - images: `Image.open`, `load()` to decode fully, read the size, then close;
+  - PDFs: open once, count the pages, and read each page's rendered width,
+    `ceil(width × DPI / 72)` as pypdfium2 computes it;
   - every page at least `--columns` px wide (R5).
 
   It then yields RGB arrays: images through `convert("RGB")`, PDF pages through
@@ -48,7 +49,7 @@ Paddle code and no console command; phase 02 adds both.
   - RGBA, grayscale and palette images;
   - `--dpi 144` on a 72 px page gives 144 px;
   - the red-page PDF's center pixel is nearest to (255, 0, 0);
-  - an empty folder, a zero-page PDF, `notes.dat`, a corrupt image and a truncated PNG each raise
+  - an empty folder, a zero-page PDF, `notes.dat`, a corrupt image, a truncated PNG and a truncated JPEG each raise
     `InputError` naming the path;
   - a fake document with `len == 0` raises `InputError`;
   - a page narrower than `--columns` raises `InputError` naming it;
@@ -68,16 +69,20 @@ Paddle code and no console command; phase 02 adds both.
 ### 4. CLI (`src/scanscribe/cli.py`)
 
 - [ ] 4.1 Build the argparse parser with the R19 options and defaults (`prog="scanscribe"`). Add
-  validators for `--columns` and `--dpi` below 1 (R9), and for the R10 path rules. `run` catches
+  validators for `--columns` and `--dpi` below 1 (R9), and for the R10 path rules, each reported through `parser.error()`; writability is checked with
+  `os.access`. `run` catches
   argparse's `SystemExit` and returns its code (D7). Verify: a test for each rule asserts that
-  `run` returns 2 and the engine factory is never called; another asserts that `--help` returns 0.
-- [ ] 4.2 Add `run(argv, engine_factory) -> int` in the D6 order. The output goes to a temp file in
-  the output's directory, which is renamed with `os.replace`. Progress goes to stderr (R11). Verify:
+  `run` returns 2 and the engine factory is never called; another asserts the defaults (`en`, 200, 1, no device) and that `--help` lists every R19 option
+  and returns 0.
+- [ ] 4.2 Add `run(argv, engine_factory) -> int` in the D6 order. After OCR, the text goes to a temp file
+  `.<name>.<random>.tmp` in the output's directory, which gets the old output's mode (or the umask
+  default) and is renamed with `os.replace`. Progress goes to stderr (R11). Verify:
   end-to-end tests with `FakeEngine` on a 3-image folder and a 2-page PDF check:
   - the exact output;
   - page and slice order with `--columns 2`;
   - an empty stdout and the stderr lines;
   - no temp file left behind;
+  - an existing 0644 output keeps its mode;
   - an unwritable output directory returns 2 before the factory is called.
 - [ ] 4.3 Map errors to exit codes (D7, R12, R20). After parsing, every `Exception` gives one
   `scanscribe: error:` line and 1; `KeyboardInterrupt` gives 130. The output is never created or
@@ -87,8 +92,10 @@ Paddle code and no console command; phase 02 adds both.
   - a `FakeEngine` that raises on page 2, with an existing output left byte-identical;
   - `os.replace` patched to raise `OSError`;
   - a `FakeEngine` that raises `KeyboardInterrupt`;
+  - a `FakeEngine` error with a 5-line message, which prints one line;
 
-  each with no `Traceback` on stderr and no temp file left.
+  each with no `Traceback` on stderr and no temp file left. A last test sets `SCANSCRIBE_DEBUG=1`
+  and asserts the engine error is re-raised (D7).
 
 ### 5. Phase checks
 

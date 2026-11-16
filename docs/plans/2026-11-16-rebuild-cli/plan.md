@@ -3,7 +3,7 @@ title: Rebuild the scanscribe CLI from the ocr-pdf prototype
 status: draft
 created: 2026-11-16
 updated: 2026-11-16
-design_review: { status: changes-requested, rounds: 2, last: 2026-11-16 }
+design_review: { status: passed, rounds: 2, last: 2026-11-16 }
 approved: null
 adr_review: null
 ---
@@ -18,8 +18,8 @@ OCR engine moves behind an interface (D1). Paddle is imported only when OCR star
 the tests never import PaddlePaddle. The tool chooses the device itself and prints it (D3). Images
 reach PaddleOCR in the BGR order it expects (D4). Bad arguments, empty or unreadable inputs and
 unwritable outputs are caught before OCR starts. A failure during OCR leaves the output file
-untouched (R5–R12, R20, D6). Two input rules change: hidden files are skipped (R1), and a dotted
-folder keeps its full name in the output file name (R6).
+untouched (R5–R12, R20, D6). Five behaviors break parity with the prototype; What changes lists
+them.
 
 Phase 01 builds the pipeline and the CLI against a fake engine. Phase 02 adds the PaddleOCR adapter,
 the `scanscribe` command and the owner's manual check on GPU and CPU. The main risk is that the BGR
@@ -28,8 +28,8 @@ prototype's.
 
 ```text
 validate args and paths (R9, R10) ─▶ list pages (R1, R2) ─▶ pre-check pages and widths (R5, R7, R8)
-  ─▶ open temp output (D6) ─▶ load engine, choose and print device (D2, D3)
-  ─▶ per page: split (R4) ─▶ recognize ─▶ format (R3) ─▶ rename temp onto output (D6)
+  ─▶ load engine, choose and print device (D2, D3) ─▶ for each page: split (R4), recognize
+  ─▶ format all pages (R3) ─▶ write a temp file and rename it onto the output, once (D6)
 ```
 
 ## Why
@@ -76,8 +76,9 @@ extras are now in place, so the CLI comes next. The full behavior inventory is i
   `sys.modules` so the adapter can be tested without PaddlePaddle.
 - **Adapter**: the engine that wraps PaddleOCR (`PaddleOcrEngine`, in `scanscribe.paddle_engine`).
 - **PaddleX**: the library PaddleOCR is built on. It does the image reading and device handling.
-- **MKL-DNN**: Intel's CPU acceleration in PaddlePaddle (oneDNN). Its PP-OCRv6 path crashes on
-  the locked version, so it is turned off on the CPU (notes.md#d3).
+- **MKL-DNN**: Intel's CPU acceleration in PaddlePaddle (oneDNN). It crashes with PaddleOCR's
+  PP-OCRv6 text detection model on the locked PaddlePaddle 3.3.1, so it is turned off on the CPU
+  (notes.md#d3).
 - **Base install**: `uv sync` with no extra, as in CI. It has no PaddlePaddle or PaddleOCR.
 - **Extra**: the `gpu` or `cpu` optional dependency set. At most one is installed.
 - **Device string**: PaddleOCR's `device` value, such as `gpu:0` or `cpu`.
@@ -88,9 +89,9 @@ extras are now in place, so the CLI comes next. The full behavior inventory is i
 
 ### R1 · Folder pages are image files in natural order
 
-A folder's pages are only the regular, non-hidden files directly inside it with a supported extension (`.png .jpg .jpeg .tif .tiff .bmp .webp`, any case), in natural filename order, with ties broken by exact name.
-- **Given** `page10.png`, `page2.png` and `page1.PNG`, **when** the folder is read, **then** the order is `page1.PNG`, `page2.png`, `page10.png`.
-- **Given** a subfolder named `x.png`, `notes.txt` and `._page1.jpg`, **when** the folder is read, **then** none of them is a page.
+A folder's pages are the regular files directly inside it whose names don't start with `.` and end in a supported extension (`.png .jpg .jpeg .tif .tiff .bmp .webp`, any case), sorted by name with case ignored and digit runs compared as numbers, with ties broken by the exact name.
+- **Given** `Page10.png`, `page2.png` and `page1.PNG`, **when** the folder is read, **then** the order is `page1.PNG`, `page2.png`, `Page10.png`.
+- **Given** a subfolder named `x.png`, a file `notes.txt` and a file `._page1.jpg`, **when** the folder is read, **then** none of them is a page.
 - **Given** `a.png` and `A.png`, **when** the folder is read, **then** `A.png` comes first on every run.
 
 ### R2 · PDF pages are rendered at the requested DPI
@@ -105,7 +106,7 @@ Each page is the line `--- Page N ---` and a newline, then its lines joined by n
 
 ### R4 · Columns are read left to right
 
-With `--columns N`, slice edges sit at `round(i × width / N)` for i = 0…N, and the slices' lines are written left to right under one page marker.
+With `--columns N`, slice edges sit at Python's `round(i × width / N)` (halves to even, as in the prototype) for i = 0…N, and the slices' lines are written left to right under one page marker.
 - **Given** `--columns 2` and a page whose left half reads `L` and right half `R`, **when** it is OCR'd, **then** the page's lines are `L` then `R`.
 - **Given** `--columns 3` and a 100 px page, **when** it is split, **then** the slice widths are 33, 34 and 33 px.
 
@@ -130,7 +131,7 @@ A folder with no page files, or a PDF that has no pages or can't be opened, is a
 ### R8 · An unreadable page aborts the run and leaves the output untouched
 
 A page that can't be read is an input error naming the page, and the output file is neither created nor changed.
-- **Given** a folder whose third file is a corrupt or truncated `.png`, **when** the run starts, **then** it exits 1 naming that file, before the engine is loaded.
+- **Given** a folder whose third file is a corrupt `.png` or a truncated `.jpg`, **when** the run starts, **then** it exits 1 naming that file, before the engine is loaded.
 - **Given** an existing output file and a page that fails during OCR, **when** the run aborts, **then** the existing file is byte-identical.
 
 ### R9 · `--columns` and `--dpi` must be at least 1
@@ -142,19 +143,20 @@ A `--columns` or `--dpi` value below 1 is a usage error.
 
 A missing input, an output that is an existing directory, an output directory that is missing or not writable, or an output that resolves to the input is a usage error, raised before any page is read.
 - **Given** `-o missing-dir/out.txt`, or `-o out` where `out/` is a directory, **when** the command runs, **then** it exits 2 and no page is read.
-- **Given** an output directory without write permission, **when** the command runs, **then** it exits 2 before the engine loads.
+- **Given** an output directory without write permission, **when** the command runs, **then** it exits 2 and no page is read.
 - **Given** `-o book.pdf` for the input `book.pdf`, **when** the command runs, **then** it exits 2 and the PDF is untouched.
 
 ### R11 · Progress goes to stderr, never stdout
 
-All progress and messages go to stderr, including `Processing page N...` for each page and `Extracted text written to <path>` at the end, and stdout stays empty.
+All progress and messages go to stderr, including `Processing page N...` for each page and `Extracted text written to <path>` at the end, and stdout stays empty. Only `--help` prints to stdout, as argparse does.
 - **Given** a 2-page run, **when** it finishes, **then** stdout is empty and stderr has `Processing page 1...` then `Processing page 2...`.
 
 ### R12 · Errors other than usage errors are one line, never a traceback
 
-Every error that is not a usage error is printed as one stderr line that starts with `scanscribe: error:`, with no traceback.
+Every error that is not a usage error is printed as one stderr line that starts with `scanscribe: error:`, with no traceback, even when the underlying message spans several lines.
 - **Given** an engine that raises on page 2, **when** the run fails, **then** stderr ends with one `scanscribe: error:` line and contains no `Traceback`.
 - **Given** the final rename fails with an `OSError`, **when** the run fails, **then** it exits 1 with one such line.
+- **Given** an engine error whose message has 5 lines, **when** the run fails, **then** stderr has exactly one `scanscribe: error:` line.
 
 ### R13 · The test suite and the CLI's import path never import Paddle
 
@@ -204,19 +206,20 @@ An interrupted run exits 130 with one `scanscribe: error:` line, and the output 
 ### D1 · A one-method engine protocol, injected into the CLI
 
 `OcrEngine` is a `typing.Protocol` with one method, `recognize(image) -> list[str]`, which takes an
-RGB slice. `cli.run(argv, engine_factory)` takes a factory `(lang, device) -> OcrEngine`. Tests pass
-the fake engine. `main()` passes `load_engine` (D2), which also chooses and prints the device
+RGB slice. `cli.run(argv, engine_factory)` in `cli.py` takes a factory `(lang, device) -> OcrEngine`.
+Tests pass the fake engine. `cli.main()` passes `engine.load_engine` (D2), which also chooses and prints the device
 (R15, R16), so `cli.run` never touches Paddle. Rejected: an abstract base class (the fake would have
 to inherit from it for no gain); passing PaddleOCR's result objects through (that would tie the
 tests to Paddle's result shape).
 
 ### D2 · Paddle is imported only inside `load_engine`
 
-`scanscribe.paddle_engine` imports `paddle` and `paddleocr` at its top. Only `load_engine` imports
-that module, inside the function. An `ImportError` naming `paddle`, `paddleocr` or a submodule
-becomes `EngineMissingError` (R14); any other import error propagates. Rejected: a guarded import at
-the top of a module (every run and every test would attempt it); entry-point plugins (one engine
-doesn't need them).
+`scanscribe.paddle_engine` imports `paddle` and `paddleocr` at its top. Only `load_engine`, in
+`scanscribe/engine.py`, imports that module, inside the function. A `ModuleNotFoundError` whose name
+is exactly `paddle` or `paddleocr` becomes `EngineMissingError` (R14). Any other import error, such
+as a broken native library in an installed build, is reported on the R12 line. Rejected: a guarded
+import at the top of a module (every run and every test would attempt it); entry-point plugins (one
+engine doesn't need them).
 
 ### D3 · We choose the device ourselves, with PaddleX's own check
 
@@ -229,7 +232,7 @@ the same one PaddleX uses for its default device. Choosing it ourselves lets us 
 
 PaddleOCR's pipeline reads NumPy input as BGR, and the prototype passed RGB. Page sources yield RGB:
 images through Pillow's `convert("RGB")`, PDF pages through `to_pil().convert("RGB")`, as the
-prototype did, since pypdfium2's raw buffer is BGR. Only the adapter flips to BGR (R18). Rejected:
+prototype did. pypdfium2's raw buffer is BGR, so it is never used directly. Only the adapter flips to BGR (R18). Rejected:
 keeping RGB for byte parity (keeps a known bug). Details: [notes.md#d4](notes.md#d4-paddleocr-reads-arrays-as-bgr)
 
 ### D5 · The output path comes from the resolved input name
@@ -241,24 +244,31 @@ the output away from where prototype users expect it).
 
 ### D6 · Check everything before OCR; replace the output atomically at the end
 
-The order is: validate arguments and paths (R9, R10); list the pages; pre-check every page
-(`Image.verify()` and size for images, size × DPI for PDF pages) (R5, R7, R8); create a temp file
-in the output's directory; load the engine; OCR; write the temp file and `os.replace` it onto the
-output. Any failure deletes the temp file. Rejected: writing page by page (partial file);
-`write_text` on the output (truncates the old file first); skipping bad pages (owner chose to
-abort, 2026-11-16).
+1. Validate arguments and paths (R9, R10).
+2. List the pages.
+3. Pre-check every page: fully decode each image and read its size; read each PDF page's rendered
+   width (R5, R7, R8).
+4. Load the engine and OCR every page.
+5. Write the text to a temp file `.<name>.<random>.tmp` in the output's directory, give it the old
+   output's mode (or the umask default), and `os.replace` it onto the output.
+
+Any failure deletes the temp file. Rejected: `Image.verify()` (checks only PNG and WebP data);
+writing page by page (partial file); `write_text` on the output (truncates the old file first);
+skipping bad pages (owner's choice, 2026-11-16). Details: [notes.md#d6](notes.md#d6-what-pillows-verify-checks)
 
 ### D7 · Exit codes 0, 1, 2 and 130
 
-0 means success. 2 means a usage error, printed in argparse's own two-line format. 1 means any
-other error, and 130 means Ctrl-C (R20). `run` catches argparse's `SystemExit` and returns its code.
-After parsing, it catches every `Exception`, prints the R12 line, and returns 1. Rejected: listing
-the exception types to catch (misses `OSError` and others, which then print tracebacks).
+0 means success. 2 means a usage error: argument and path checks call `parser.error()`, which
+prints argparse's two-line format. 1 means any other error, and 130 means Ctrl-C (R20). `run`
+catches argparse's `SystemExit` and returns its code. After parsing, it catches every `Exception`,
+collapses the message to one line of at most 300 characters, prints the R12 line and returns 1.
+With `SCANSCRIBE_DEBUG=1` it re-raises instead, for a full traceback. Rejected: listing the
+exception types to catch (misses `OSError` and others).
 
 ### D8 · Empty inputs are errors
 
 A run with no pages has nothing useful to write, and an empty output file looks like a success
-downstream. pypdfium2 (5.13.0, and 5.15.2 as locked) refuses to open a zero-page PDF, so both "can't
+downstream. pypdfium2 (5.13.0 in the prototype, 5.15.2 as locked here) refuses to open a zero-page PDF, so both "can't
 open" and "0 pages" give the R7 error. Rejected: writing an empty file, as the prototype did.
 Details: [notes.md#d8](notes.md#d8-zero-page-pdfs-in-pypdfium2)
 
@@ -277,15 +287,15 @@ could slip in). Details: [notes.md#d9](notes.md#d9-fake-engine-and-fixtures)
   message on the R12 line.
 - The adapter keeps the prototype's three PaddleOCR flags (`use_doc_orientation_classify`,
   `use_doc_unwarping`, `use_textline_orientation`), all `False`.
-- `Image.verify()` catches truncated PNGs but not every damaged JPEG. A page that still fails during
-  OCR is covered by R8.
+- An output path that is a symlink is replaced by a regular file, not written through.
 - Two runs writing the same output each finish with a complete file; the last rename wins.
 
 ## Risks
 
 - The OCR text differs from the prototype's. `uv.lock` pins the same Paddle versions as the
-  prototype, and only pypdfium2 differs, so a diff mostly measures D4 → the owner reads the
-  differing lines locally. Any page that reads worse blocks phase 02 and gets its own issue
+  prototype and only pypdfium2 differs, so a diff mostly measures D4. Mitigation: the manual check
+  includes a color page. A page reads worse when a word the prototype got right is wrong. Phase 02
+  then stays blocked until the owner reverses D4 through a plan update or accepts the result
   ([notes.md#manual-check](notes.md#manual-check)).
 - Paddle APIs change (`device_count`, or `rec_texts`, the result key that holds recognized lines) →
   `uv.lock` pins the versions, and phase 02 task 1.1 re-checks the source references in notes.md.
@@ -298,7 +308,9 @@ could slip in). Details: [notes.md#d9](notes.md#d9-fake-engine-and-fixtures)
 
 No deployment. Each phase merges to `main` through its own PR. Until phase 02 merges, `main` has
 the pipeline but no `scanscribe` command, and the README still says "under construction". To roll
-back, revert the PR. The prototype stays usable outside this repository.
+back, revert the PR. The prototype stays usable outside this repository. The downstream
+`study-book-chapter` skill reads whatever text it is given, and the format (R3) is unchanged, so it
+needs no change.
 
 ## Open questions
 
@@ -307,7 +319,8 @@ back, revert the PR. The prototype stays usable outside this repository.
 ## Impact
 
 - Packages / directories: `src/scanscribe/`, `tests/`, `pyproject.toml`, `README.md`,
-  `docs/decision-log.md` (one line for the BGR change and the new edge-case behavior).
+  `docs/decision-log.md` (one line for the BGR change and the new edge-case behavior), and the
+  Status line in `AGENTS.md`.
 - Data: none. Book inputs and outputs stay local and ignored by Git.
 - Jobs / APIs: the CLI surface (R19) and the output format (R3). The CI workflow doesn't change.
 
@@ -323,8 +336,8 @@ back, revert the PR. The prototype stays usable outside this repository.
 
 | Phase | Title | Status | Tasks | Delivers |
 | --- | --- | --- | --- | --- |
-| 01 | Page pipeline and CLI on a fake engine | draft | 0/12 | R1–R12, R20 |
-| 02 | PaddleOCR adapter and the scanscribe command | draft | 0/8 | R13–R19 |
+| 01 | [Page pipeline and CLI on a fake engine](phases/01-pipeline-and-cli.md) | draft | 0/12 | R1–R12, R20 |
+| 02 | [PaddleOCR adapter and the scanscribe command](phases/02-paddleocr-adapter.md) | draft | 0/8 | R13–R19 |
 
 ## Decision log
 

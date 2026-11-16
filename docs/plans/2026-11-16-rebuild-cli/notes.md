@@ -58,6 +58,26 @@ Re-check these paths against the version in `uv.lock` when phase 02 starts.
 - So the prototype's RGB arrays were read with red and blue swapped. For black text on white the
   effect should be small. Phase 02's manual check measures it.
 
+## D6: What Pillow's verify checks
+
+Found in the design review (round 2, zoom-out reviewer) on the locked Pillow:
+
+- `PIL/Image.py`, `Image.verify` is `pass`; `PIL/ImageFile.py`, the base `verify()` only closes
+  the file. Only `PngImagePlugin.py` overrides it with a real check.
+- Images cut to half their length:
+
+| Format | `verify()` | `convert("RGB")` |
+| --- | --- | --- |
+| JPEG | passes | `OSError: image file is truncated` |
+| TIFF | passes | `OSError: image file is truncated` |
+| BMP | passes | `OSError: image file is truncated` |
+| PNG | `OSError` | `OSError` |
+| WebP | `OSError` | `OSError` |
+
+So the pre-check decodes each image fully with `load()`, then closes it. Decoding each image twice costs
+seconds per few hundred pages, against hours of lost OCR. Phone and camera scans
+are usually JPEG, so `verify()` alone would miss the common case.
+
 ## D8: Zero-page PDFs in pypdfium2
 
 Observed with pypdfium2 5.13.0 (no OCR, no device involved). The design review's codebase-fit
@@ -84,8 +104,8 @@ to the same input error. The `len == 0` branch is tested by substituting a fake 
   72 × 72 px image is a 1-inch page and `--dpi 144` must render it at 144 px.
 - A corrupt image is a file with a `.png` extension and random bytes; `Image.open` rejects it.
 - A truncated image is a valid PNG cut to its first 60 bytes. The codebase-fit reviewer saw
-  `Image.open` accept it and `convert` raise `OSError`. The pre-check's `verify()` must reject it;
-  phase 01 task 1.2 confirms that.
+  `Image.open` accept it and `convert` raise `OSError`. The pre-check's full decode must reject it;
+  phase 01 task 1.2 confirms that `load()` rejects it.
 - The plain-text input is `notes.dat`, so its default output (`notes.txt`) isn't the input itself.
 - No fixture file is committed. `.gitignore` already allows `tests/fixtures/**`; it stays unused.
 
@@ -97,15 +117,22 @@ committed), once with each extra:
 ```bash
 # outputs go to out/, which Git ignores
 # prototype (its GPU build; add --device cpu for the CPU comparison)
-(cd ../ocr-pdf && uv run ocr-pdf <input> -o ../scanscribe/out/proto.txt)
-# scanscribe, once per extra
-uv sync --extra gpu && uv run scanscribe <input> -o out/gpu.txt
-uv sync --extra cpu && uv run scanscribe <input> -o out/cpu.txt
+IN=/absolute/path/to/input   # a PDF or folder with at least one color page; absolute, because of the cd
+(cd ../ocr-pdf && uv run ocr-pdf "$IN" -o ../scanscribe/out/proto.txt)
+# scanscribe, once per extra; stdout must stay empty
+uv sync --extra gpu && uv run scanscribe "$IN" -o out/gpu.txt > out/gpu.stdout && test ! -s out/gpu.stdout
+uv sync --extra cpu && uv run scanscribe "$IN" -o out/cpu.txt > out/cpu.stdout && test ! -s out/cpu.stdout
 diff out/proto.txt out/gpu.txt | grep -c '^[<>]'   # a count only; never paste book lines
 ```
 
-Pass rule: the owner reads the differing lines locally. If any page reads worse than the
-prototype's, phase 02 is blocked and the page gets its own issue (described, not quoted).
+Pass rule: the owner reads the differing lines locally. A page reads worse when a word the
+prototype got right is wrong in scanscribe's output. Such a page gets its own issue (described, not
+quoted), and phase 02 stays blocked until the owner either reverses D4 through a plan update or
+accepts the result. A grayscale-only input can't show the D4 effect, so the input includes at
+least one color page (for example, a highlighted or sepia screenshot).
+
+Then start one more run on each device and press Ctrl-C during page 2 or later: it must exit 130,
+leave any existing output unchanged, and leave no `.*.tmp` file behind.
 
 Record in the PR: the input described without quoting it (for example "a 12-page two-column
 scan"), the command, the device line printed, the run time, page count, and how many lines differ

@@ -5,7 +5,7 @@ status: draft
 branch: null
 base: null
 delivers: [R13, R14, R15, R16, R17, R18, R19]
-design_review: { status: changes-requested, rounds: 2, last: 2026-11-16 }
+design_review: { status: passed, rounds: 2, last: 2026-11-16 }
 impl_review: { status: none, rounds: 0, last: null }
 approved: null
 ---
@@ -29,7 +29,7 @@ output with the prototype's on both devices.
   (D2). It has `resolve_device(requested)` (R15, D3) and `PaddleOcrEngine(lang, device)`. The engine:
   - passes the prototype's three `use_*=False` flags;
   - adds `enable_mkldnn=False` only on `cpu*` (R17);
-  - flips RGB to BGR in `recognize` (R18, D4);
+  - flips RGB to BGR in `recognize` with `np.ascontiguousarray(image[:, :, ::-1])` (R18, D4);
   - collects each result's `rec_texts`.
 
   Add mypy overrides for `paddle` and `paddleocr`. Add a test fixture that installs fake Paddle
@@ -42,13 +42,13 @@ output with the prototype's on both devices.
 
   `uv run mypy` passes on the base install.
 - [ ] 1.3 Add `load_engine(lang, device)` to `engine.py`. It imports `scanscribe.paddle_engine`
-  inside the function (D2) and turns an `ImportError` for `paddle`/`paddleocr` into
-  `EngineMissingError`, an `InputError` with the R14 message. It then resolves the device and prints
+  inside the function (D2) and turns a `ModuleNotFoundError` for exactly `paddle` or
+  `paddleocr` into `EngineMissingError`, an `InputError` with the R14 message. It then resolves the device and prints
   `Using device: <d>` to stderr (R16). Verify these tests:
   - with `sys.modules["paddle"]` and `["paddleocr"]` set to `None`, it raises the R14 message on any
     install;
   - with fake modules, the device line appears before `Processing page 1...`;
-  - an unrelated `ImportError` propagates.
+  - an `ImportError` named `paddle.base.core` (a broken install) is not reported as a missing engine.
 - [ ] 1.4 Add `main()` (`sys.exit(run(sys.argv[1:], load_engine))`) and
   `[project.scripts] scanscribe = "scanscribe.cli:main"` (R19). Add the R13 tests:
   - a subprocess imports every scanscribe module except `paddle_engine`, then calls
@@ -67,17 +67,25 @@ output with the prototype's on both devices.
   - the exit codes;
   - the first-run model download, and that two simultaneous first runs can collide on it.
 
-  Add a line to `docs/decision-log.md` for the BGR change and the new edge-case behavior. Verify:
+  Add a line to `docs/decision-log.md` for the BGR change and the new edge-case behavior, and update
+  the Status line in `AGENTS.md`. Verify:
   the lychee links job passes in CI.
 - [ ] 2.2 Run the AGENTS.md checks locally, then the suite once from a clean clone with only
   `uv sync --locked`. Verify: all commands exit 0.
 
 ### 3. Manual OCR check (owner)
 
-- [ ] 3.1 Owner, GPU: run the prototype and `scanscribe` on the same local input with the `gpu`
-  extra, following [notes.md#manual-check](../notes.md#manual-check). Read the differing lines
-  locally. Verify: no page reads worse than the prototype's, and any page that does gets its own
-  issue and blocks this phase. The PR records the device line (`gpu:0`), page count, run time and
-  the number of differing lines, with no book text.
-- [ ] 3.2 Owner, CPU: repeat with the `cpu` extra. Verify: the device line reads `cpu`, there is no
-  oneDNN error, the same pass rule holds, and the PR records the same facts.
+- [ ] 3.1 Owner, GPU: run the prototype and `scanscribe` with the `gpu` extra on the same local
+  input, which includes at least one color page, following
+  [notes.md#manual-check](../notes.md#manual-check). Read the differing lines locally, then press
+  Ctrl-C once during a second run. Verify:
+  - no page reads worse, meaning no word the prototype got right is wrong. If one does, it gets its
+    own issue, and this phase stays blocked until the owner reverses D4 through a plan update or
+    accepts the result;
+  - stdout stayed empty;
+  - Ctrl-C exited 130 with the output untouched and no temp file left.
+
+  The PR records the device line (`gpu:0`), page count, run time and the number of differing lines,
+  with no book text.
+- [ ] 3.2 Owner, CPU: repeat 3.1 with the `cpu` extra. Verify: the device line reads `cpu`, there is
+  no oneDNN error, the same checks hold, and the PR records the same facts.
