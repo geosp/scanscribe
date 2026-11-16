@@ -25,7 +25,7 @@ Paddle code and no console command; phase 02 adds both.
 - [x] 1.1 Add `src/scanscribe/engine.py` with the `OcrEngine` protocol, the `EngineFactory` type
   `(lang, device: str | None) -> OcrEngine`, and the errors `ScanscribeError`, then `UsageError` and
   `InputError` under it (D1, D7). Verify: `uv run mypy` passes.
-- [ ] 1.2 Add `tests/conftest.py` with `FakeEngine`, which names the nearest palette color, and
+- [x] 1.2 Add `tests/conftest.py` with `FakeEngine`, which names the nearest palette color, and
   fixture builders in `tmp_path` (D9, [notes.md#d9](../notes.md#d9-fake-engine-and-fixtures)):
   image folders, multi-page PDFs, a red-page PDF, a zero-page PDF, `notes.dat`, a corrupt image, a
   truncated PNG and a truncated JPEG. Verify: a smoke test builds each fixture; `Image.load()` rejects
