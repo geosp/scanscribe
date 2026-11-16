@@ -68,7 +68,7 @@ Paddle code and no console command; phase 02 adds both.
 
 ### 4. CLI (`src/scanscribe/cli.py`)
 
-- [ ] 4.1 Build the argparse parser with the R19 options and defaults (`prog="scanscribe"`). Add
+- [x] 4.1 Build the argparse parser with the R19 options and defaults (`prog="scanscribe"`). Add
   validators for `--columns` and `--dpi` below 1 (R9), and for the R10 path rules, each reported through `parser.error()`; writability is checked with
   `os.access`. `run` catches
   argparse's `SystemExit` and returns its code (D7). Verify: a test for each rule asserts that
