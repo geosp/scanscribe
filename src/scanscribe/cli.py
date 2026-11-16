@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 from scanscribe.engine import EngineFactory, UsageError
-from scanscribe.output import default_output_path
+from scanscribe.output import default_output_path, format_pages, write_atomic
+from scanscribe.pages import open_source, split_columns
 
 
 def _at_least_one(value: str) -> int:
@@ -82,6 +84,30 @@ def resolve_output(input_path: Path, output: Path | None) -> Path:
     return output
 
 
+def _progress(message: str) -> None:
+    """Progress and messages go to stderr; stdout stays empty (R11)."""
+    print(message, file=sys.stderr, flush=True)
+
+
+def convert(args: argparse.Namespace, output: Path, engine_factory: EngineFactory) -> None:
+    """OCR every page and write the output once, in the D6 order.
+
+    Pages are listed and pre-checked before the engine loads, so a bad page fails fast. The
+    output is replaced only after every page has been read.
+    """
+    with open_source(args.input, args.dpi, args.columns) as source:
+        engine = engine_factory(args.lang, args.device)
+        pages: list[list[str]] = []
+        for number, image in enumerate(source.images(), 1):
+            _progress(f"Processing page {number}...")
+            lines: list[str] = []
+            for column in split_columns(image, args.columns):
+                lines.extend(engine.recognize(column))
+            pages.append(lines)
+    write_atomic(output, format_pages(pages))
+    _progress(f"Extracted text written to {output}")
+
+
 def _exit_code(exc: SystemExit) -> int:
     if exc.code is None:
         return 0
@@ -94,9 +120,10 @@ def run(argv: Sequence[str], engine_factory: EngineFactory) -> int:
     try:
         args = parser.parse_args(argv)
         try:
-            resolve_output(args.input, args.output)
+            output = resolve_output(args.input, args.output)
         except UsageError as exc:
             parser.error(str(exc))
     except SystemExit as exc:
         return _exit_code(exc)
+    convert(args, output, engine_factory)
     return 0

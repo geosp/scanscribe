@@ -74,7 +74,7 @@ Paddle code and no console command; phase 02 adds both.
   argparse's `SystemExit` and returns its code (D7). Verify: a test for each rule asserts that
   `run` returns 2 and the engine factory is never called; another asserts the defaults (`en`, 200, 1, no device) and that `--help` lists every R19 option
   and returns 0.
-- [ ] 4.2 Add `run(argv, engine_factory) -> int` in the D6 order. After OCR, the text goes to a temp file
+- [x] 4.2 Add `run(argv, engine_factory) -> int` in the D6 order. After OCR, the text goes to a temp file
   `.<name>.<random>.tmp` in the output's directory, which gets the old output's mode (or the umask
   default) and is renamed with `os.replace`. Progress goes to stderr (R11). Verify:
   end-to-end tests with `FakeEngine` on a 3-image folder and a 2-page PDF check:
