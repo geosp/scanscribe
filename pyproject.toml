@@ -1,0 +1,65 @@
+[project]
+name = "scanscribe"
+version = "0.1.0"
+description = "OCR scanned PDFs and folders of page images into page-marked text, on the GPU when available."
+readme = "README.md"
+authors = [
+    { name = "Geovanny Fajardo", email = "20133884+geosp@users.noreply.github.com" },
+]
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "numpy>=1.26",
+    "pillow>=10.0",
+    "pypdfium2>=5.13.0",
+]
+
+[project.optional-dependencies]
+# Install exactly one OCR engine build: `uv sync --extra gpu` or `uv sync --extra cpu`.
+cpu = [
+    "paddleocr>=3.7.0",
+    "paddlepaddle>=3.3.1",
+]
+gpu = [
+    "paddleocr>=3.7.0",
+    "paddlepaddle-gpu>=3.3.1",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.13",
+    "pytest>=8.3",
+    "ruff>=0.8",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.4,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+conflicts = [
+    [{ extra = "cpu" }, { extra = "gpu" }],
+]
+
+[[tool.uv.index]]
+name = "paddlepaddle-cu126"
+url = "https://www.paddlepaddle.org.cn/packages/stable/cu126/"
+explicit = true
+
+[tool.uv.sources]
+paddlepaddle-gpu = { index = "paddlepaddle-cu126" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+packages = ["scanscribe"]
+mypy_path = "src"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
