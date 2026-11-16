@@ -33,7 +33,7 @@ Paddle code and no console command; phase 02 adds both.
 
 ### 2. Page sources (`src/scanscribe/pages.py`)
 
-- [ ] 2.1 List a folder's pages: regular files only, supported extensions in any case, no dotfiles,
+- [x] 2.1 List a folder's pages: regular files only, supported extensions in any case, no dotfiles,
   natural order: text parts case-folded, digit runs as numbers, the exact name as tiebreaker. Split on
   `\d+` and convert only the digit parts (R1). Verify: tests for `page2` before `Page10`, upper-case extensions, a subfolder named `x.png`,
   `notes.txt`, `._page1.jpg`, and `A.png` before `a.png`.
