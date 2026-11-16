@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -224,3 +225,194 @@ def test_new_output_gets_the_umask_default_mode(
     finally:
         os.umask(old_umask)
     assert output.stat().st_mode & 0o777 == 0o640
+
+
+# --- Errors and exit codes (R5, R7, R8, R12, R20, D7) --------------------------------------
+
+
+def error_lines(err: str) -> list[str]:
+    return [line for line in err.splitlines() if line.startswith("scanscribe: error:")]
+
+
+def assert_one_error_line(err: str, contains: str) -> None:
+    assert "Traceback" not in err
+    [line] = error_lines(err)
+    assert err.rstrip("\n").endswith(line)
+    assert contains in line
+
+
+@pytest.fixture
+def existing_output(tmp_path: Path) -> Path:
+    output = tmp_path / "out.txt"
+    output.write_bytes(b"previous run\n\xe2\x9c\x93\n")
+    return output
+
+
+def test_empty_folder_exits_1_without_output(
+    tmp_path: Path, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = tmp_path / "empty"
+    folder.mkdir()
+    assert run([str(folder)], factory) == 1
+    assert_one_error_line(capsys.readouterr().err, "no page images found")
+    assert not (tmp_path / "empty.txt").exists()
+    assert factory.calls == []
+    assert temp_files(tmp_path) == []
+
+
+@pytest.mark.parametrize("builder", ["zero_page_pdf", "notes_dat"])
+def test_unopenable_pdf_exits_1_naming_it(
+    fx: Fixtures,
+    tmp_path: Path,
+    factory: FakeFactory,
+    capsys: pytest.CaptureFixture[str],
+    builder: str,
+) -> None:
+    path = getattr(fx, builder)()
+    assert run([str(path)], factory) == 1
+    assert_one_error_line(capsys.readouterr().err, path.name)
+    assert not path.with_suffix(".txt").exists()
+    assert factory.calls == []
+
+
+def test_narrow_page_exits_1_before_the_engine_loads(
+    fx: Fixtures, tmp_path: Path, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = fx.image_folder("book", {"p1.png": ["red"]}, width=3)
+    assert run([str(folder), "--columns", "4"], factory) == 1
+    assert_one_error_line(capsys.readouterr().err, "p1.png")
+    assert factory.calls == []
+    assert not (tmp_path / "book.txt").exists()
+
+
+def test_corrupt_third_image_exits_1_before_the_engine_loads(
+    fx: Fixtures,
+    tmp_path: Path,
+    factory: FakeFactory,
+    existing_output: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    folder = fx.image_folder("book", {"p1.png": ["red"], "p2.png": ["blue"]})
+    fx.corrupt_image(folder, "p3.png")
+    before = existing_output.read_bytes()
+    assert run([str(folder), "-o", str(existing_output)], factory) == 1
+    err = capsys.readouterr().err
+    assert_one_error_line(err, "p3.png")
+    assert "Processing page" not in err
+    assert factory.calls == []
+    assert existing_output.read_bytes() == before
+
+
+def test_engine_error_on_page_2_leaves_the_output_untouched(
+    fx: Fixtures,
+    tmp_path: Path,
+    make_factory: Callable[..., FakeFactory],
+    existing_output: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    folder = fx.image_folder("book", {"p1.png": ["red"], "p2.png": ["blue"], "p3.png": ["red"]})
+    factory = make_factory(fail_on_call=2, error=RuntimeError("model crashed"))
+    before = existing_output.read_bytes()
+    assert run([str(folder), "-o", str(existing_output)], factory) == 1
+    err = capsys.readouterr().err
+    assert_one_error_line(err, "RuntimeError: model crashed")
+    assert "Processing page 2..." in err
+    assert existing_output.read_bytes() == before
+    assert temp_files(tmp_path) == []
+
+
+def test_failed_rename_exits_1_and_removes_the_temp_file(
+    fx: Fixtures,
+    tmp_path: Path,
+    factory: FakeFactory,
+    existing_output: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    folder = fx.image_folder("book", {"p1.png": ["red"]})
+    before = existing_output.read_bytes()
+
+    def fail(src: object, dst: object) -> None:
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(os, "replace", fail)
+    assert run([str(folder), "-o", str(existing_output)], factory) == 1
+    assert_one_error_line(capsys.readouterr().err, "No space left on device")
+    assert existing_output.read_bytes() == before
+    assert temp_files(tmp_path) == []
+
+
+def test_ctrl_c_during_page_2_exits_130_and_leaves_the_output_untouched(
+    fx: Fixtures,
+    tmp_path: Path,
+    make_factory: Callable[..., FakeFactory],
+    existing_output: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    folder = fx.image_folder("book", {"p1.png": ["red"], "p2.png": ["blue"]})
+    factory = make_factory(fail_on_call=2, error=KeyboardInterrupt())
+    before = existing_output.read_bytes()
+    assert run([str(folder), "-o", str(existing_output)], factory) == 130
+    assert_one_error_line(capsys.readouterr().err, "interrupted")
+    assert existing_output.read_bytes() == before
+    assert temp_files(tmp_path) == []
+
+
+def test_ctrl_c_during_the_write_removes_the_temp_file(
+    fx: Fixtures,
+    tmp_path: Path,
+    factory: FakeFactory,
+    existing_output: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    folder = fx.image_folder("book", {"p1.png": ["red"]})
+    before = existing_output.read_bytes()
+
+    def interrupt(src: object, dst: object) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(os, "replace", interrupt)
+    assert run([str(folder), "-o", str(existing_output)], factory) == 130
+    assert_one_error_line(capsys.readouterr().err, "interrupted")
+    assert existing_output.read_bytes() == before
+    assert temp_files(tmp_path) == []
+
+
+def test_multi_line_error_prints_one_line(
+    fx: Fixtures,
+    make_factory: Callable[..., FakeFactory],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    folder = fx.image_folder("book", {"p1.png": ["red"]})
+    message = "line one\nline two\nline three\nline four\nline five"
+    factory = make_factory(fail_on_call=1, error=ValueError(message))
+    assert run([str(folder)], factory) == 1
+    err = capsys.readouterr().err
+    assert_one_error_line(err, "ValueError: line one line two line three line four line five")
+
+
+def test_long_error_is_cut_to_300_characters(
+    fx: Fixtures,
+    make_factory: Callable[..., FakeFactory],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    folder = fx.image_folder("book", {"p1.png": ["red"]})
+    factory = make_factory(fail_on_call=1, error=RuntimeError("x" * 1000))
+    assert run([str(folder)], factory) == 1
+    [line] = error_lines(capsys.readouterr().err)
+    message = line.removeprefix("scanscribe: error: ")
+    assert len(message) == 300
+    assert message.endswith("...")
+
+
+def test_debug_env_re_raises_the_engine_error(
+    fx: Fixtures,
+    make_factory: Callable[..., FakeFactory],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    folder = fx.image_folder("book", {"p1.png": ["red"]})
+    factory = make_factory(fail_on_call=1, error=RuntimeError("model crashed"))
+    monkeypatch.setenv("SCANSCRIBE_DEBUG", "1")
+    with pytest.raises(RuntimeError, match="model crashed"):
+        run([str(folder)], factory)

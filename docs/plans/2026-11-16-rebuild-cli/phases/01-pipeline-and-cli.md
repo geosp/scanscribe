@@ -84,7 +84,7 @@ Paddle code and no console command; phase 02 adds both.
   - no temp file left behind;
   - an existing 0644 output keeps its mode;
   - an unwritable output directory returns 2 before the factory is called.
-- [ ] 4.3 Map errors to exit codes (D7, R12, R20). After parsing, every `Exception` gives one
+- [x] 4.3 Map errors to exit codes (D7, R12, R20). After parsing, every `Exception` gives one
   `scanscribe: error:` line and 1; `KeyboardInterrupt` gives 130. The output is never created or
   changed on failure (R7, R8). Verify these tests:
   - an empty folder;

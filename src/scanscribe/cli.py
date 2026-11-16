@@ -8,7 +8,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from scanscribe.engine import EngineFactory, UsageError
+from scanscribe.engine import EngineFactory, ScanscribeError, UsageError
 from scanscribe.output import default_output_path, format_pages, write_atomic
 from scanscribe.pages import open_source, split_columns
 
@@ -108,6 +108,31 @@ def convert(args: argparse.Namespace, output: Path, engine_factory: EngineFactor
     _progress(f"Extracted text written to {output}")
 
 
+MAX_ERROR_LENGTH = 300
+"""Longest error message printed, in characters (D7)."""
+
+DEBUG_ENV = "SCANSCRIBE_DEBUG"
+"""Set to 1 to re-raise errors with a full traceback instead of the one-line message (D7)."""
+
+
+def _one_line(exc: BaseException) -> str:
+    """The error as one line of at most MAX_ERROR_LENGTH characters (R12).
+
+    scanscribe's own errors print their message; anything else is prefixed with its type.
+    """
+    message = " ".join(str(exc).split())
+    if not isinstance(exc, ScanscribeError):
+        name = type(exc).__name__
+        message = f"{name}: {message}" if message else name
+    if len(message) > MAX_ERROR_LENGTH:
+        message = message[: MAX_ERROR_LENGTH - 3] + "..."
+    return message
+
+
+def _error(message: str) -> None:
+    print(f"scanscribe: error: {message}", file=sys.stderr, flush=True)
+
+
 def _exit_code(exc: SystemExit) -> int:
     if exc.code is None:
         return 0
@@ -115,7 +140,11 @@ def _exit_code(exc: SystemExit) -> int:
 
 
 def run(argv: Sequence[str], engine_factory: EngineFactory) -> int:
-    """Run scanscribe with `argv` (without the program name) and return the exit code."""
+    """Run scanscribe with `argv` (without the program name) and return the exit code (D7).
+
+    0 is success, 2 a usage error, 1 any other error and 130 Ctrl-C. Errors after parsing are
+    printed as one `scanscribe: error:` line, and the output file is never created or changed.
+    """
     parser = build_parser()
     try:
         args = parser.parse_args(argv)
@@ -125,5 +154,14 @@ def run(argv: Sequence[str], engine_factory: EngineFactory) -> int:
             parser.error(str(exc))
     except SystemExit as exc:
         return _exit_code(exc)
-    convert(args, output, engine_factory)
+    try:
+        convert(args, output, engine_factory)
+    except KeyboardInterrupt:
+        _error("interrupted")
+        return 130
+    except Exception as exc:
+        if os.environ.get(DEBUG_ENV) == "1":
+            raise
+        _error(_one_line(exc))
+        return 1
     return 0
