@@ -15,9 +15,11 @@ What the prototype (`ocr-pdf`, `src/ocr_pdf/cli.py`, ~150 lines) does, and how t
 | `"--- Page N ---\n" + "\n".join(lines)`, pages joined by `"\n\n"`, written once at the end | Same (R3, D6) |
 | Default output `input.with_suffix(".txt")` for files and folders | Same for files. Folders use the full folder name (R6, D5) |
 | `PaddleOCR(lang, device=None or --device, three use_* flags False, enable_mkldnn=False)` | Same flags. Device resolved by us (D3). `enable_mkldnn=False` only on the CPU (R17) |
+| PDF pages via `page.render(scale).to_pil().convert("RGB")`; images via Pillow `convert("RGB")` | Same conversions (D4) |
 | `ocr.predict(rgb_array)`, then `result.get("rec_texts", [])` for each result | Same calls, but the array is BGR (D4) |
 | `Processing page N...` and `Extracted text written to <path>` on stderr | Same, plus the device line (R11, R16) |
-| Missing input → `parser.error` (exit 2). Every other failure → traceback | Usage and input errors with exit 2 and 1 (D7, R12) |
+| Missing input → `parser.error` (exit 2). Every other failure → traceback | Exit codes 2, 1 and 130, one-line errors (D7, R12, R20) |
+| Writes the output with `write_text` at the end | Temp file and `os.replace` (D6) |
 | Depends on `paddlepaddle-gpu` only; imports `paddleocr` inside `extract_text` | Two exclusive extras (already in `pyproject.toml`); lazy loader (D2) |
 
 Installed versions in the prototype's environment: paddleocr 3.7.0, paddlex 3.7.2,
@@ -48,12 +50,18 @@ Re-check these paths against the version in `uv.lock` when phase 02 starts.
   already.
 - The per-model predictors then convert BGR to RGB for their own input (`ReadImage(format="RGB")` in
   the text detection and recognition predictors).
+- PDF pages: pypdfium2's raw bitmap is BGR(x). `render()` has `rev_byteorder=False` by default
+  (`pypdfium2/_helpers/page.py`, around lines 453 and 520 in 5.15.2), and `to_numpy()` returns that
+  buffer as is. `to_pil()` builds a correct RGB image, which the prototype used. So the prototype's
+  PDF pages were RGB, like its images. The codebase-fit reviewer saw a red page come back as
+  `[0 0 254]` from `to_numpy()` and `(254, 0, 0)` from `to_pil()`.
 - So the prototype's RGB arrays were read with red and blue swapped. For black text on white the
   effect should be small. Phase 02's manual check measures it.
 
 ## D8: Zero-page PDFs in pypdfium2
 
-Observed with pypdfium2 5.13.0 (no OCR, no device involved):
+Observed with pypdfium2 5.13.0 (no OCR, no device involved). The design review's codebase-fit
+reviewer repeated the first and third checks on the locked 5.15.2, with the same results.
 
 - `PdfDocument.new()` then `.save()` writes a file that `PdfDocument(path)` refuses to open:
   `PdfiumError: Failed to load document (PDFium: Success)`.
@@ -66,14 +74,19 @@ to the same input error. The `len == 0` branch is tested by substituting a fake 
 
 ## D9: Fake engine and fixtures
 
-- Page images are solid-color RGB images made with Pillow in `tmp_path`. For column tests, each
-  slice is a different solid color.
-- `FakeEngine.recognize(image)` returns `[f"rgb{r},{g},{b}"]` for the image's center pixel and
-  records each image's shape. Tests then check page order, slice order and slice widths.
+- Page images are solid-color RGB images made with Pillow in `tmp_path`, using a small palette of
+  well-separated colors (for example red, green, blue, black, white). For column tests, each slice
+  is a different color.
+- `FakeEngine.recognize(image)` returns the name of the palette color nearest to the image's center
+  pixel (for example `["red"]`), and records each image's shape. Pillow saves RGB PDF pages as JPEG,
+  so a red page can come back as (254, 0, 0); the nearest-color rule absorbs that.
 - PDFs are written by Pillow (`save_all=True, append_images=[...]`, `resolution=72.0`), so a
   72 × 72 px image is a 1-inch page and `--dpi 144` must render it at 144 px.
-- A corrupt image is a file with a valid extension and random bytes. A "truncated" image keeps the
-  PNG header and drops the rest.
+- A corrupt image is a file with a `.png` extension and random bytes; `Image.open` rejects it.
+- A truncated image is a valid PNG cut to its first 60 bytes. The codebase-fit reviewer saw
+  `Image.open` accept it and `convert` raise `OSError`. The pre-check's `verify()` must reject it;
+  phase 01 task 1.2 confirms that.
+- The plain-text input is `notes.dat`, so its default output (`notes.txt`) isn't the input itself.
 - No fixture file is committed. `.gitignore` already allows `tests/fixtures/**`; it stays unused.
 
 ## Manual check
@@ -90,6 +103,9 @@ uv sync --extra gpu && uv run scanscribe <input> -o out/gpu.txt
 uv sync --extra cpu && uv run scanscribe <input> -o out/cpu.txt
 diff out/proto.txt out/gpu.txt | grep -c '^[<>]'   # a count only; never paste book lines
 ```
+
+Pass rule: the owner reads the differing lines locally. If any page reads worse than the
+prototype's, phase 02 is blocked and the page gets its own issue (described, not quoted).
 
 Record in the PR: the input described without quoting it (for example "a 12-page two-column
 scan"), the command, the device line printed, the run time, page count, and how many lines differ
