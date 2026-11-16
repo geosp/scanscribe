@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import numpy as np
 import pytest
 from conftest import Fixtures, nearest_color, page_image
 
@@ -16,6 +17,7 @@ from scanscribe.pages import (
     list_image_files,
     natural_key,
     open_source,
+    split_columns,
 )
 
 # --- Folder listing (R1) -------------------------------------------------------------------
@@ -196,3 +198,30 @@ def test_many_images_do_not_exhaust_file_handles(fx: Fixtures) -> None:
     finally:
         resource.setrlimit(resource.RLIMIT_NOFILE, (soft, hard))
     assert count == 200
+
+
+# --- Column split (R4) ---------------------------------------------------------------------
+
+
+def test_three_columns_of_100_px_are_33_34_33() -> None:
+    image = np.zeros((10, 100, 3), dtype=np.uint8)
+    assert [s.shape[1] for s in split_columns(image, 3)] == [33, 34, 33]
+
+
+def test_one_column_returns_the_image_unchanged() -> None:
+    image = np.zeros((10, 7, 3), dtype=np.uint8)
+    [only] = split_columns(image, 1)
+    assert only is image
+
+
+def test_slices_run_left_to_right_and_cover_the_page() -> None:
+    image = np.asarray(page_image(["red", "green", "blue"], width=10))
+    slices = split_columns(image, 3)
+    assert [nearest_color(s[0, 0]) for s in slices] == ["red", "green", "blue"]
+    assert sum(s.shape[1] for s in slices) == 10
+
+
+def test_halves_round_to_even() -> None:
+    # 5 px in 2 columns: the edge 2.5 rounds to 2.
+    image = np.zeros((1, 5, 3), dtype=np.uint8)
+    assert [s.shape[1] for s in split_columns(image, 2)] == [2, 3]

@@ -54,7 +54,7 @@ Paddle code and no console command; phase 02 adds both.
   - a fake document with `len == 0` raises `InputError`;
   - a page narrower than `--columns` raises `InputError` naming it;
   - 200 images under a lowered `RLIMIT_NOFILE` of 64 (POSIX only) don't exhaust file handles.
-- [ ] 2.3 Add `split_columns(image, n)` with edges at `round(i * width / n)` (R4). Verify: widths
+- [x] 2.3 Add `split_columns(image, n)` with edges at `round(i * width / n)` (R4). Verify: widths
   33/34/33 for 100 px and n=3; n=1 returns the image unchanged.
 - [x] 2.4 Add a mypy override (`ignore_missing_imports`) for `pypdfium2` only if mypy reports it
   untyped. Verify: `uv run mypy` passes.

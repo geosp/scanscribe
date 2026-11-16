@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Iterator
+from itertools import pairwise
 from pathlib import Path
 from types import TracebackType
 
@@ -183,3 +184,16 @@ def open_source(path: Path, dpi: int, columns: int) -> PageSource:
     if path.is_dir():
         return ImageFolderSource(path, columns)
     return PdfSource(path, dpi, columns)
+
+
+def split_columns(image: PageImage, n: int) -> list[PageImage]:
+    """Cut a page into n vertical slices, left to right, with edges at round(i × width / n) (R4).
+
+    Python's round() sends halves to even, as the prototype did. With n = 1 the page is returned
+    unchanged.
+    """
+    if n <= 1:
+        return [image]
+    width = image.shape[1]
+    edges = [round(i * width / n) for i in range(n + 1)]
+    return [image[:, left:right] for left, right in pairwise(edges)]
