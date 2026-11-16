@@ -55,3 +55,5 @@ Reviewers: fresh reader ✅ · codebase fit ✅ · zoom out ✅ (commit d5f1a46;
 | F42 | Nit | zoom out | Rollout doesn't say whether the downstream consumer (`study-book-chapter`) is affected | fixed: Rollout & rollback |
 | F43 | Nit | zoom out | Ctrl-C (R20) is never observed with real Paddle; add it to the manual check | fixed: notes Manual check; phase 02 3.1 |
 | F44 | Nit | fresh reader | Small wording gaps: rename drawn on the per-page line, R11 vs `--help` on stdout, R4 half rounding, "PP-OCRv6"/"locked version", "hidden", 5.13.0's meaning, D4 causality, the Risks arrow, R10's two "before" points | fixed: Summary diagram, Terms, R1, R4, R10, R11, D4, D8, Risks |
+
+## 2026-11-16 · approved · plan (phases 01 and 02)
