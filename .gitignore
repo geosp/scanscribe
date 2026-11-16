@@ -41,3 +41,6 @@ out/
 .vscode/*
 !.vscode/extensions.json
 .DS_Store
+
+# Scratch output from the github-pr skill
+pr-description.md
