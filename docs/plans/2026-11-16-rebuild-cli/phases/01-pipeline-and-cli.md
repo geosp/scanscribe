@@ -61,9 +61,9 @@ Paddle code and no console command; phase 02 adds both.
 
 ### 3. Output (`src/scanscribe/output.py`)
 
-- [ ] 3.1 Add `format_pages(pages: list[list[str]]) -> str` (R3). Verify: the exact string from R3's
+- [x] 3.1 Add `format_pages(pages: list[list[str]]) -> str` (R3). Verify: the exact string from R3's
   scenario; a single page; an empty last page.
-- [ ] 3.2 Add `default_output_path(input)` (R6, D5). Verify: `book.v2.pdf`, the folder `Vol.2`,
+- [x] 3.2 Add `default_output_path(input)` (R6, D5). Verify: `book.v2.pdf`, the folder `Vol.2`,
   `.` inside a folder, and a trailing slash.
 
 ### 4. CLI (`src/scanscribe/cli.py`)
