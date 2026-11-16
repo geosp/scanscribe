@@ -3,7 +3,7 @@ title: Rebuild the scanscribe CLI from the ocr-pdf prototype
 status: draft
 created: 2026-11-16
 updated: 2026-11-16
-design_review: { status: passed, rounds: 1, last: 2026-11-16 }
+design_review: { status: changes-requested, rounds: 2, last: 2026-11-16 }
 approved: null
 adr_review: null
 ---
