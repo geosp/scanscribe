@@ -37,7 +37,7 @@ Paddle code and no console command; phase 02 adds both.
   natural order: text parts case-folded, digit runs as numbers, the exact name as tiebreaker. Split on
   `\d+` and convert only the digit parts (R1). Verify: tests for `page2` before `Page10`, upper-case extensions, a subfolder named `x.png`,
   `notes.txt`, `._page1.jpg`, and `A.png` before `a.png`.
-- [ ] 2.2 Build a page source for each input kind. Before any OCR it exposes each page's label (the
+- [x] 2.2 Build a page source for each input kind. Before any OCR it exposes each page's label (the
   file name, or `page N`) and checks every page (D6):
   - images: `Image.open`, `load()` to decode fully, read the size, then close;
   - PDFs: open once, count the pages, and read each page's rendered width,
@@ -56,7 +56,7 @@ Paddle code and no console command; phase 02 adds both.
   - 200 images under a lowered `RLIMIT_NOFILE` of 64 (POSIX only) don't exhaust file handles.
 - [ ] 2.3 Add `split_columns(image, n)` with edges at `round(i * width / n)` (R4). Verify: widths
   33/34/33 for 100 px and n=3; n=1 returns the image unchanged.
-- [ ] 2.4 Add a mypy override (`ignore_missing_imports`) for `pypdfium2` only if mypy reports it
+- [x] 2.4 Add a mypy override (`ignore_missing_imports`) for `pypdfium2` only if mypy reports it
   untyped. Verify: `uv run mypy` passes.
 
 ### 3. Output (`src/scanscribe/output.py`)
