@@ -15,33 +15,57 @@ The two extras conflict on purpose: the GPU and CPU builds of PaddlePaddle canno
 
 ## Usage
 
-```bash
-uv run scanscribe book.pdf                  # writes book.txt next to the PDF
-uv run scanscribe scans/ch1/ -o ch1.txt     # a folder of page images
-uv run scanscribe book.pdf --columns 2      # two-column pages, read left to right
+Keep books in `in/` and results in `out/`. Git ignores both folders, so book material stays local. For example:
+
+```text
+in/
+  my-book.pdf
+  my-book/                 # a book as page images, one folder per chapter
+    01_introduction/
+      page001.jpg
+      page002.jpg
+    02_chapter_two/
+out/                       # scanscribe writes here
 ```
 
-More examples:
+scanscribe doesn't create missing folders, so create the output folder first:
 
 ```bash
-# A folder of page images for one chapter, two columns per page; writes scans/ch3.txt
-uv run scanscribe scans/ch3 --columns 2
+mkdir -p out
+```
 
-# A Spanish chapter, written to out/
-uv run scanscribe scans/capitulo_01 --lang es -o out/capitulo_01.txt
+Examples:
+
+```bash
+# A PDF
+uv run scanscribe in/my-book.pdf -o out/my-book.txt
+
+# One chapter of page images
+uv run scanscribe in/my-book/01_introduction -o out/01_introduction.txt
+
+# Pages with two columns, read left column first, then right
+uv run scanscribe in/my-book/02_chapter_two --columns 2 -o out/02_chapter_two.txt
+
+# A Spanish chapter
+uv run scanscribe in/mi-libro/capitulo_01 --lang es -o out/capitulo_01.txt
 
 # A small or low-quality scan: render PDF pages at a higher resolution
-uv run scanscribe old-scan.pdf --dpi 300
+uv run scanscribe in/old-scan.pdf --dpi 300 -o out/old-scan.txt
 
 # Force the CPU, for example while the GPU is busy
-uv run scanscribe book.pdf --device cpu
+uv run scanscribe in/my-book.pdf --device cpu -o out/my-book.txt
 
-# Every chapter folder of a book, one text file per chapter
-for ch in scans/my-book/*/; do uv run scanscribe "$ch" --lang es; done
+# Every chapter of a book, one text file per chapter in out/my-book/
+mkdir -p out/my-book
+for ch in in/my-book/*/; do
+  uv run scanscribe "$ch" -o "out/my-book/$(basename "$ch").txt"
+done
 
 # Keep the progress log, for example on a long run
-uv run scanscribe book.pdf 2> scanscribe.log
+uv run scanscribe in/my-book.pdf -o out/my-book.txt 2> out/my-book.log
 ```
+
+Without `-o`, the output goes next to the input: `in/my-book.pdf` writes `in/my-book.txt`, and the folder `in/my-book/01_introduction/` writes `in/my-book/01_introduction.txt`.
 
 Tips:
 - **Columns:** `--columns` cuts every page into equal-width strips at the exact middle; it doesn't look for the gap between columns. Run single-column pages, such as a chapter opening, separately without it.
