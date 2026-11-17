@@ -45,7 +45,7 @@ output with the prototype's on both devices.
     empty.
 
   `uv run mypy` passes on the base install.
-- [ ] 1.3 Add `load_engine(lang, device)` to `engine.py`. It imports `scanscribe.paddle_engine` inside the function with `importlib.import_module` (D2), so a
+- [x] 1.3 Add `load_engine(lang, device)` to `engine.py`. It imports `scanscribe.paddle_engine` inside the function with `importlib.import_module` (D2), so a
   test that cleared it gets a fresh import, and turns a `ModuleNotFoundError` for exactly `paddle` or
   `paddleocr` into `EngineMissingError`, an `InputError` with the R14 message. It then resolves the device and prints `Using device: <d>` to stderr before building `PaddleOCR`,
   so the line shows during a first-run model download (R16). Verify these tests:
