@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from conftest import FakeFactory, Fixtures
 
+from scanscribe import cli
 from scanscribe.cli import build_parser, run
 
 # --- Arguments and paths (R9, R10, R19, D7) ------------------------------------------------
@@ -467,3 +468,20 @@ def test_debug_env_re_raises_the_engine_error(
     monkeypatch.setenv("SCANSCRIBE_DEBUG", "1")
     with pytest.raises(RuntimeError, match="model crashed"):
         run([str(folder)], factory)
+
+
+def test_ctrl_c_during_the_path_check_exits_130(
+    fx: Fixtures,
+    factory: FakeFactory,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    folder = fx.image_folder("book", {"p1.png": ["red"]})
+
+    def interrupt(input_path: Path, output: Path | None) -> Path:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "resolve_output", interrupt)
+    assert run([str(folder)], factory) == 130
+    assert_one_error_line(capsys.readouterr().err, "interrupted")
+    assert factory.calls == []

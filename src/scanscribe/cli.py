@@ -153,6 +153,14 @@ def run(argv: Sequence[str], engine_factory: EngineFactory) -> int:
     0 is success, 2 a usage error, 1 any other error and 130 Ctrl-C. Errors after parsing are
     printed as one `scanscribe: error:` line, and the output file is never created or changed.
     """
+    try:
+        return _run(argv, engine_factory)
+    except KeyboardInterrupt:
+        _error("interrupted")
+        return 130
+
+
+def _run(argv: Sequence[str], engine_factory: EngineFactory) -> int:
     parser = build_parser()
     try:
         args = parser.parse_args(argv)
@@ -164,9 +172,6 @@ def run(argv: Sequence[str], engine_factory: EngineFactory) -> int:
         return _exit_code(exc)
     try:
         convert(args, output, engine_factory)
-    except KeyboardInterrupt:
-        _error("interrupted")
-        return 130
     except Exception as exc:
         if os.environ.get(DEBUG_ENV) == "1":
             raise
