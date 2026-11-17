@@ -16,6 +16,23 @@ from scanscribe.cli import build_parser, run
 # --- Arguments and paths (R9, R10, R19, D7) ------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def no_temp_file_left(tmp_path: Path) -> Iterator[None]:
+    """Every run, whatever its outcome, leaves no `.tmp` file next to its output (D6, R20)."""
+    yield
+    assert [p for p in tmp_path.rglob("*.tmp") if p.is_file()] == []
+
+
+@pytest.fixture
+def pages_never_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fails the run if it reads any page: usage errors come first (R10)."""
+
+    def fail(*args: object) -> None:
+        raise AssertionError("a page was read before the usage error")
+
+    monkeypatch.setattr(cli, "open_source", fail)
+
+
 def test_defaults() -> None:
     args = build_parser().parse_args(["book.pdf"])
     assert (args.lang, args.dpi, args.columns, args.device, args.output) == (
@@ -43,7 +60,11 @@ def test_help_lists_every_option_on_stdout(
     [["--columns", "0"], ["--dpi", "-5"], ["--dpi", "0"], ["--columns", "two"]],
 )
 def test_columns_and_dpi_below_1_are_usage_errors(
-    fx: Fixtures, factory: FakeFactory, capsys: pytest.CaptureFixture[str], argv: list[str]
+    pages_never_read: None,
+    fx: Fixtures,
+    factory: FakeFactory,
+    capsys: pytest.CaptureFixture[str],
+    argv: list[str],
 ) -> None:
     folder = fx.image_folder("book", {"p1.png": ["red"]})
     assert run([str(folder), *argv], factory) == 2
@@ -54,7 +75,7 @@ def test_columns_and_dpi_below_1_are_usage_errors(
 
 
 def test_missing_input_is_a_usage_error(
-    tmp_path: Path, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+    pages_never_read: None, tmp_path: Path, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert run([str(tmp_path / "missing.pdf")], factory) == 2
     assert "input not found" in capsys.readouterr().err
@@ -62,7 +83,11 @@ def test_missing_input_is_a_usage_error(
 
 
 def test_output_in_a_missing_directory_is_a_usage_error(
-    fx: Fixtures, tmp_path: Path, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+    pages_never_read: None,
+    fx: Fixtures,
+    tmp_path: Path,
+    factory: FakeFactory,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     folder = fx.image_folder("book", {"p1.png": ["red"]})
     output = tmp_path / "missing-dir" / "out.txt"
@@ -72,7 +97,11 @@ def test_output_in_a_missing_directory_is_a_usage_error(
 
 
 def test_output_that_is_a_directory_is_a_usage_error(
-    fx: Fixtures, tmp_path: Path, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+    pages_never_read: None,
+    fx: Fixtures,
+    tmp_path: Path,
+    factory: FakeFactory,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     folder = fx.image_folder("book", {"p1.png": ["red"]})
     (tmp_path / "out").mkdir()
@@ -85,7 +114,11 @@ def test_output_that_is_a_directory_is_a_usage_error(
     sys.platform == "win32" or os.geteuid() == 0, reason="needs POSIX permissions, not root"
 )
 def test_unwritable_output_directory_is_a_usage_error(
-    fx: Fixtures, tmp_path: Path, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+    pages_never_read: None,
+    fx: Fixtures,
+    tmp_path: Path,
+    factory: FakeFactory,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     folder = fx.image_folder("book", {"p1.png": ["red"]})
     locked = tmp_path / "locked"
@@ -101,7 +134,7 @@ def test_unwritable_output_directory_is_a_usage_error(
 
 
 def test_output_that_is_the_input_is_a_usage_error(
-    fx: Fixtures, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+    pages_never_read: None, fx: Fixtures, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
 ) -> None:
     pdf = fx.red_pdf("book.pdf")
     before = pdf.read_bytes()
@@ -112,7 +145,7 @@ def test_output_that_is_the_input_is_a_usage_error(
 
 
 def test_input_named_txt_would_overwrite_itself_by_default(
-    fx: Fixtures, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+    pages_never_read: None, fx: Fixtures, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
 ) -> None:
     text = fx.notes_dat("notes.txt")
     assert run([str(text)], factory) == 2
@@ -120,7 +153,7 @@ def test_input_named_txt_would_overwrite_itself_by_default(
 
 
 def test_output_that_is_the_same_file_under_another_name_is_a_usage_error(
-    fx: Fixtures, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+    pages_never_read: None, fx: Fixtures, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
 ) -> None:
     # A hard link stands in for BOOK.PDF vs book.pdf on a case-insensitive file system.
     pdf = fx.red_pdf("book.pdf")
@@ -135,7 +168,11 @@ def test_output_that_is_the_same_file_under_another_name_is_a_usage_error(
 
 @pytest.mark.parametrize("name", ["p1.png", "p9.PNG"])
 def test_output_that_would_be_a_page_of_the_folder_is_a_usage_error(
-    fx: Fixtures, factory: FakeFactory, capsys: pytest.CaptureFixture[str], name: str
+    pages_never_read: None,
+    fx: Fixtures,
+    factory: FakeFactory,
+    capsys: pytest.CaptureFixture[str],
+    name: str,
 ) -> None:
     folder = fx.image_folder("book", {"p1.png": ["red"]})
     before = (folder / "p1.png").read_bytes()
@@ -174,7 +211,10 @@ def locked_dir(tmp_path: Path) -> Iterator[Path]:
 
 
 def test_input_in_an_unreadable_directory_is_a_usage_error(
-    locked_dir: Path, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+    pages_never_read: None,
+    locked_dir: Path,
+    factory: FakeFactory,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert run([str(locked_dir / "book.pdf")], factory) == 2
     assert_usage_error(capsys.readouterr().err, "book.pdf")
@@ -182,7 +222,11 @@ def test_input_in_an_unreadable_directory_is_a_usage_error(
 
 
 def test_output_in_an_unreadable_directory_is_a_usage_error(
-    fx: Fixtures, locked_dir: Path, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+    pages_never_read: None,
+    fx: Fixtures,
+    locked_dir: Path,
+    factory: FakeFactory,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     folder = fx.image_folder("book", {"p1.png": ["red"]})
     assert run([str(folder), "-o", str(locked_dir / "out.txt")], factory) == 2
@@ -192,7 +236,11 @@ def test_output_in_an_unreadable_directory_is_a_usage_error(
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX symlinks")
 def test_output_that_is_a_symlink_loop_is_a_usage_error(
-    fx: Fixtures, tmp_path: Path, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+    pages_never_read: None,
+    fx: Fixtures,
+    tmp_path: Path,
+    factory: FakeFactory,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     folder = fx.image_folder("book", {"p1.png": ["red"]})
     loop = tmp_path / "loop.txt"
@@ -322,7 +370,9 @@ def error_lines(err: str) -> list[str]:
     return [line for line in err.splitlines() if line.startswith("scanscribe: error:")]
 
 
-def assert_one_error_line(err: str, contains: str) -> None:
+def assert_one_error_line(captured: pytest.CaptureResult[str], contains: str) -> None:
+    assert captured.out == ""
+    err = captured.err
     assert "Traceback" not in err
     [line] = error_lines(err)
     assert err.rstrip("\n").endswith(line)
@@ -342,7 +392,7 @@ def test_empty_folder_exits_1_without_output(
     folder = tmp_path / "empty"
     folder.mkdir()
     assert run([str(folder)], factory) == 1
-    assert_one_error_line(capsys.readouterr().err, "no page images found")
+    assert_one_error_line(capsys.readouterr(), "no page images found")
     assert not (tmp_path / "empty.txt").exists()
     assert factory.calls == []
     assert temp_files(tmp_path) == []
@@ -358,7 +408,7 @@ def test_unopenable_pdf_exits_1_naming_it(
 ) -> None:
     path = getattr(fx, builder)()
     assert run([str(path)], factory) == 1
-    assert_one_error_line(capsys.readouterr().err, path.name)
+    assert_one_error_line(capsys.readouterr(), path.name)
     assert not path.with_suffix(".txt").exists()
     assert factory.calls == []
 
@@ -368,12 +418,18 @@ def test_narrow_page_exits_1_before_the_engine_loads(
 ) -> None:
     folder = fx.image_folder("book", {"p1.png": ["red"]}, width=3)
     assert run([str(folder), "--columns", "4"], factory) == 1
-    assert_one_error_line(capsys.readouterr().err, "p1.png")
+    assert_one_error_line(capsys.readouterr(), "p1.png")
     assert factory.calls == []
     assert not (tmp_path / "book.txt").exists()
 
 
-def test_corrupt_third_image_exits_1_before_the_engine_loads(
+@pytest.mark.parametrize(
+    ("builder", "name"),
+    [("corrupt_image", "p3.png"), ("truncated_png", "p3.png"), ("truncated_jpeg", "p3.jpg")],
+)
+def test_unreadable_third_image_exits_1_before_the_engine_loads(
+    builder: str,
+    name: str,
     fx: Fixtures,
     tmp_path: Path,
     factory: FakeFactory,
@@ -381,11 +437,12 @@ def test_corrupt_third_image_exits_1_before_the_engine_loads(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     folder = fx.image_folder("book", {"p1.png": ["red"], "p2.png": ["blue"]})
-    fx.corrupt_image(folder, "p3.png")
+    getattr(fx, builder)(folder, name)
     before = existing_output.read_bytes()
     assert run([str(folder), "-o", str(existing_output)], factory) == 1
-    err = capsys.readouterr().err
-    assert_one_error_line(err, "p3.png")
+    captured = capsys.readouterr()
+    err = captured.err
+    assert_one_error_line(captured, name)
     assert "Processing page" not in err
     assert factory.calls == []
     assert existing_output.read_bytes() == before
@@ -402,8 +459,9 @@ def test_engine_error_on_page_2_leaves_the_output_untouched(
     factory = make_factory(fail_on_call=2, error=RuntimeError("model crashed"))
     before = existing_output.read_bytes()
     assert run([str(folder), "-o", str(existing_output)], factory) == 1
-    err = capsys.readouterr().err
-    assert_one_error_line(err, "RuntimeError: model crashed")
+    captured = capsys.readouterr()
+    err = captured.err
+    assert_one_error_line(captured, "RuntimeError: model crashed")
     assert "Processing page 2..." in err
     assert existing_output.read_bytes() == before
     assert temp_files(tmp_path) == []
@@ -425,7 +483,7 @@ def test_failed_rename_exits_1_and_removes_the_temp_file(
 
     monkeypatch.setattr(os, "replace", fail)
     assert run([str(folder), "-o", str(existing_output)], factory) == 1
-    assert_one_error_line(capsys.readouterr().err, "No space left on device")
+    assert_one_error_line(capsys.readouterr(), "No space left on device")
     assert existing_output.read_bytes() == before
     assert temp_files(tmp_path) == []
 
@@ -441,7 +499,7 @@ def test_ctrl_c_during_page_2_exits_130_and_leaves_the_output_untouched(
     factory = make_factory(fail_on_call=2, error=KeyboardInterrupt())
     before = existing_output.read_bytes()
     assert run([str(folder), "-o", str(existing_output)], factory) == 130
-    assert_one_error_line(capsys.readouterr().err, "interrupted")
+    assert_one_error_line(capsys.readouterr(), "interrupted")
     assert existing_output.read_bytes() == before
     assert temp_files(tmp_path) == []
 
@@ -462,7 +520,7 @@ def test_ctrl_c_during_the_write_removes_the_temp_file(
 
     monkeypatch.setattr(os, "replace", interrupt)
     assert run([str(folder), "-o", str(existing_output)], factory) == 130
-    assert_one_error_line(capsys.readouterr().err, "interrupted")
+    assert_one_error_line(capsys.readouterr(), "interrupted")
     assert existing_output.read_bytes() == before
     assert temp_files(tmp_path) == []
 
@@ -476,8 +534,9 @@ def test_multi_line_error_prints_one_line(
     message = "line one\nline two\nline three\nline four\nline five"
     factory = make_factory(fail_on_call=1, error=ValueError(message))
     assert run([str(folder)], factory) == 1
-    err = capsys.readouterr().err
-    assert_one_error_line(err, "ValueError: line one line two line three line four line five")
+    assert_one_error_line(
+        capsys.readouterr(), "ValueError: line one line two line three line four line five"
+    )
 
 
 def test_long_error_is_cut_to_300_characters(
@@ -519,5 +578,16 @@ def test_ctrl_c_during_the_path_check_exits_130(
 
     monkeypatch.setattr(cli, "resolve_output", interrupt)
     assert run([str(folder)], factory) == 130
-    assert_one_error_line(capsys.readouterr().err, "interrupted")
+    assert_one_error_line(capsys.readouterr(), "interrupted")
     assert factory.calls == []
+
+
+def test_non_ascii_text_is_written_as_utf_8(fx: Fixtures, tmp_path: Path) -> None:
+    class AccentEngine:
+        def recognize(self, image: object) -> list[str]:
+            return ["café ✓ Ωmega"]
+
+    folder = fx.image_folder("book", {"p1.png": ["red"]})
+    output = tmp_path / "out.txt"
+    assert run([str(folder), "-o", str(output)], lambda lang, device: AccentEngine()) == 0
+    assert output.read_bytes() == "--- Page 1 ---\ncafé ✓ Ωmega".encode()
