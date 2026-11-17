@@ -133,6 +133,28 @@ def test_output_that_is_the_same_file_under_another_name_is_a_usage_error(
     assert pdf.read_bytes() == before
 
 
+@pytest.mark.parametrize("name", ["p1.png", "p9.PNG"])
+def test_output_that_would_be_a_page_of_the_folder_is_a_usage_error(
+    fx: Fixtures, factory: FakeFactory, capsys: pytest.CaptureFixture[str], name: str
+) -> None:
+    folder = fx.image_folder("book", {"p1.png": ["red"]})
+    before = (folder / "p1.png").read_bytes()
+    assert run([str(folder), "-o", str(folder / name)], factory) == 2
+    assert "output would be a page of the input folder" in capsys.readouterr().err
+    assert factory.calls == []
+    assert (folder / "p1.png").read_bytes() == before
+    assert sorted(p.name for p in folder.iterdir()) == ["p1.png"]
+
+
+@pytest.mark.parametrize("name", ["book.txt", ".p2.png"])
+def test_output_inside_the_folder_that_is_not_a_page_is_allowed(
+    fx: Fixtures, factory: FakeFactory, name: str
+) -> None:
+    folder = fx.image_folder("book", {"p1.png": ["red"]})
+    assert run([str(folder), "-o", str(folder / name)], factory) == 0
+    assert (folder / name).read_text(encoding="utf-8") == "--- Page 1 ---\nred"
+
+
 def assert_usage_error(err: str, contains: str) -> None:
     assert "Traceback" not in err
     assert err.startswith("usage: scanscribe")

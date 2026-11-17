@@ -34,19 +34,19 @@ def natural_key(name: str) -> tuple[tuple[tuple[int, int | str], ...], str]:
     return tuple(parts), name
 
 
+def is_page_name(name: str) -> bool:
+    """Whether a file with this name in a folder input is a page: not hidden, and a supported
+    image extension in any case (R1)."""
+    return not name.startswith(".") and Path(name).suffix.lower() in IMAGE_EXTENSIONS
+
+
 def list_image_files(folder: Path) -> list[Path]:
     """The folder's page images in natural order (R1).
 
     Pages are regular files directly inside the folder, not hidden, with a supported extension in
     any case.
     """
-    pages = [
-        path
-        for path in folder.iterdir()
-        if not path.name.startswith(".")
-        and path.suffix.lower() in IMAGE_EXTENSIONS
-        and path.is_file()
-    ]
+    pages = [path for path in folder.iterdir() if is_page_name(path.name) and path.is_file()]
     return sorted(pages, key=lambda path: natural_key(path.name))
 
 

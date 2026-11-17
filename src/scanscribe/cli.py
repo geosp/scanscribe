@@ -10,7 +10,7 @@ from pathlib import Path
 
 from scanscribe.engine import EngineFactory, ScanscribeError, UsageError
 from scanscribe.output import default_output_path, format_pages, write_atomic
-from scanscribe.pages import open_source, split_columns
+from scanscribe.pages import is_page_name, open_source, split_columns
 
 
 def _at_least_one(value: str) -> int:
@@ -93,6 +93,12 @@ def _check_paths(input_path: Path, output: Path | None) -> Path:
         output.exists() and os.path.samefile(output, input_path)
     ):
         raise UsageError(f"output would overwrite the input: {output}")
+    if (
+        input_path.is_dir()
+        and output.resolve().parent == input_path.resolve()
+        and is_page_name(output.name)
+    ):
+        raise UsageError(f"output would be a page of the input folder: {output}")
     return output
 
 
