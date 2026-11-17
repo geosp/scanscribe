@@ -13,6 +13,9 @@ dependencies = [
     "pypdfium2>=5.13.0",
 ]
 
+[project.scripts]
+scanscribe = "scanscribe.cli:main"
+
 [project.optional-dependencies]
 # Install exactly one OCR engine build: `uv sync --extra gpu` or `uv sync --extra cpu`.
 cpu = [

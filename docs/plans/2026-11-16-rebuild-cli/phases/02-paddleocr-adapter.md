@@ -53,7 +53,7 @@ output with the prototype's on both devices.
     install;
   - with fake modules, the device line appears before `Processing page 1...`;
   - an `ImportError` named `paddle.base.core` (a broken install) is not reported as a missing engine.
-- [ ] 1.4 Add `main()` (`sys.exit(run(sys.argv[1:], load_engine))`) and
+- [x] 1.4 Add `main()` (`sys.exit(run(sys.argv[1:], load_engine))`) and
   `[project.scripts] scanscribe = "scanscribe.cli:main"` (R19). Add the R13 tests:
   - a subprocess imports every scanscribe module except `paddle_engine`, then calls
     `run(["--help"], load_engine)`, which returns 0;

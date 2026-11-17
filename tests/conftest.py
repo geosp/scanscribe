@@ -252,3 +252,23 @@ def no_paddle(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setitem(sys.modules, "paddleocr", None)
     yield
     _forget_adapter()
+
+
+# --- No real Paddle (R13) ------------------------------------------------------------------
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Fail the run if any test imported the real `paddle` or `paddleocr` (R13).
+
+    Fakes are removed after each test, so anything left in `sys.modules` is real. This sets the
+    exit status instead of asserting, which pytest would report as an internal error.
+    """
+    leaked = sorted(name for name in ("paddle", "paddleocr") if sys.modules.get(name) is not None)
+    if leaked:
+        reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+        message = f"R13: the test run imported the real {', '.join(leaked)}"
+        if reporter is not None:
+            reporter.write_line(message, red=True)
+        else:
+            print(message, file=sys.stderr)
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
