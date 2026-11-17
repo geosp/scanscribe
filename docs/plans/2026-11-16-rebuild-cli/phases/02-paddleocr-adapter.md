@@ -5,7 +5,7 @@ status: approved
 branch: null
 base: null
 delivers: [R13, R14, R15, R16, R17, R18, R19]
-design_review: { status: passed, rounds: 2, last: 2026-11-16 }
+design_review: { status: changes-requested, rounds: 3, last: 2026-11-16 }
 impl_review: { status: none, rounds: 0, last: null }
 approved: 2026-11-16
 ---
