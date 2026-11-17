@@ -80,7 +80,7 @@ output with the prototype's on both devices.
 
 ### 3. Manual OCR check (owner)
 
-- [ ] 3.1 Owner, GPU: run the prototype and `scanscribe` with the `gpu` extra on the same local
+- [x] 3.1 Owner, GPU: run the prototype and `scanscribe` with the `gpu` extra on the same local
   input, which includes at least one color page, following
   [notes.md#manual-check](../notes.md#manual-check). Read the differing lines locally, then press
   Ctrl-C once during a second run. Verify:
@@ -94,5 +94,5 @@ output with the prototype's on both devices.
 
   The PR records the device line (`gpu:0`), page count, run time and the number of differing lines,
   with no book text.
-- [ ] 3.2 Owner, CPU: repeat 3.1 with the `cpu` extra. Verify: the device line reads `cpu`, there is
+- [x] 3.2 Owner, CPU: repeat 3.1 with the `cpu` extra. Verify: the device line reads `cpu`, there is
   no oneDNN error, the same checks hold, and the PR records the same facts.
