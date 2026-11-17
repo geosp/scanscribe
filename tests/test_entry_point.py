@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -37,3 +38,25 @@ def test_main_exits_with_runs_code(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(SystemExit) as caught:
         cli.main()
     assert caught.value.code == 0
+
+
+CONFTEST = Path(__file__).with_name("conftest.py")
+
+
+@pytest.mark.parametrize(("leak", "expected"), [(True, 1), (False, 0)])
+def test_session_check_fails_a_run_that_imported_paddle(
+    pytester: pytest.Pytester, leak: bool, expected: int
+) -> None:
+    pytester.makeconftest(CONFTEST.read_text(encoding="utf-8"))
+    body = 'sys.modules["paddle"] = types.ModuleType("paddle")' if leak else "pass"
+    pytester.makepyfile(
+        f"""
+        import sys, types
+
+        def test_it():
+            {body}
+        """
+    )
+    result = pytester.runpytest_subprocess()
+    assert result.ret == expected
+    assert ("R13: the test run imported the real paddle" in result.stdout.str()) is leak

@@ -22,6 +22,8 @@ from PIL import Image
 
 import scanscribe
 
+pytest_plugins = ["pytester"]
+
 PALETTE: dict[str, tuple[int, int, int]] = {
     "red": (255, 0, 0),
     "green": (0, 255, 0),
