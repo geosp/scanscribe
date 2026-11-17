@@ -66,8 +66,16 @@ def resolve_output(input_path: Path, output: Path | None) -> Path:
 
     Returns the output path; raises `UsageError` for a missing input, an output that is a
     directory, an output directory that is missing or not writable, or an output that is the
-    input.
+    input. A path that can't be checked at all (no permission to look, a symlink loop) is a
+    usage error too, never a traceback (R12).
     """
+    try:
+        return _check_paths(input_path, output)
+    except (OSError, RuntimeError) as exc:
+        raise UsageError(f"cannot check path: {exc}") from exc
+
+
+def _check_paths(input_path: Path, output: Path | None) -> Path:
     if not input_path.exists():
         raise UsageError(f"input not found: {input_path}")
     if output is None:

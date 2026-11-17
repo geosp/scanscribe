@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -116,6 +116,53 @@ def test_input_named_txt_would_overwrite_itself_by_default(
     text = fx.notes_dat("notes.txt")
     assert run([str(text)], factory) == 2
     assert "output would overwrite the input" in capsys.readouterr().err
+
+
+def assert_usage_error(err: str, contains: str) -> None:
+    assert "Traceback" not in err
+    assert err.startswith("usage: scanscribe")
+    assert contains in err
+
+
+@pytest.fixture
+def locked_dir(tmp_path: Path) -> Iterator[Path]:
+    """A directory nobody but root can look inside."""
+    if sys.platform == "win32" or os.geteuid() == 0:
+        pytest.skip("needs POSIX permissions, not root")
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    locked.chmod(0o000)
+    yield locked
+    locked.chmod(0o755)
+
+
+def test_input_in_an_unreadable_directory_is_a_usage_error(
+    locked_dir: Path, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run([str(locked_dir / "book.pdf")], factory) == 2
+    assert_usage_error(capsys.readouterr().err, "book.pdf")
+    assert factory.calls == []
+
+
+def test_output_in_an_unreadable_directory_is_a_usage_error(
+    fx: Fixtures, locked_dir: Path, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = fx.image_folder("book", {"p1.png": ["red"]})
+    assert run([str(folder), "-o", str(locked_dir / "out.txt")], factory) == 2
+    assert_usage_error(capsys.readouterr().err, "out.txt")
+    assert factory.calls == []
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX symlinks")
+def test_output_that_is_a_symlink_loop_is_a_usage_error(
+    fx: Fixtures, tmp_path: Path, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = fx.image_folder("book", {"p1.png": ["red"]})
+    loop = tmp_path / "loop.txt"
+    loop.symlink_to(loop)
+    assert run([str(folder), "-o", str(loop)], factory) == 2
+    assert_usage_error(capsys.readouterr().err, "loop.txt")
+    assert factory.calls == []
 
 
 # --- End to end (R3, R4, R6, R11, D6) ------------------------------------------------------
