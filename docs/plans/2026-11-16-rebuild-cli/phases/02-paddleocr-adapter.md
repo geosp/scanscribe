@@ -66,7 +66,7 @@ output with the prototype's on both devices.
 
 ### 2. Docs and checks
 
-- [ ] 2.1 Replace the README's "under construction" status with a Usage section covering:
+- [x] 2.1 Replace the README's "under construction" status with a Usage section covering:
   - the commands and options;
   - the output format;
   - the exit codes;

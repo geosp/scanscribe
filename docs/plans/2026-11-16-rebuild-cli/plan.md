@@ -343,7 +343,7 @@ needs no change.
 | Phase | Title | Status | Tasks | Delivers |
 | --- | --- | --- | --- | --- |
 | 01 | [Page pipeline and CLI on a fake engine](phases/01-pipeline-and-cli.md) | done | 12/12 | R1–R12, R20 |
-| 02 | [PaddleOCR adapter and the scanscribe command](phases/02-paddleocr-adapter.md) | in-progress | 0/8 | R13–R19 |
+| 02 | [PaddleOCR adapter and the scanscribe command](phases/02-paddleocr-adapter.md) | in-progress | 6/8 | R13–R19 |
 
 ## Decision log
 
