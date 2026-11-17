@@ -5,7 +5,7 @@ status: in-progress
 branch: feat/4-pipeline-and-cli
 base: 7594141b5dcc874b13cf03c8b7b80369fbb1b80a
 delivers: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R20]
-design_review: { status: changes-requested, rounds: 3, last: 2026-11-16 }
+design_review: { status: passed, rounds: 3, last: 2026-11-16 }
 impl_review: { status: changes-requested, rounds: 1, last: 2026-11-16 }
 approved: 2026-11-16
 ---
@@ -61,8 +61,7 @@ Paddle code and no console command; phase 02 adds both.
 
 ### 3. Output (`src/scanscribe/output.py`)
 
-- [x] 3.1 Add `format_pages(pages: list[list[str]]) -> str` (R3). Verify: the exact string from R3's
-  scenario; a single page; an empty last page.
+- [x] 3.1 Add `format_pages(pages: list[list[str]]) -> str` (R3). Verify: the exact strings from R3's scenarios; a single page; an empty last page; an empty middle page.
 - [x] 3.2 Add `default_output_path(input)` (R6, D5). Verify: `book.v2.pdf`, the folder `Vol.2`,
   `.` inside a folder, and a trailing slash.
 
@@ -83,7 +82,7 @@ Paddle code and no console command; phase 02 adds both.
   - page and slice order with `--columns 2`;
   - an empty stdout and the stderr lines;
   - no temp file left behind;
-  - an existing 0644 output keeps its mode;
+  - an existing 0600 output keeps its mode under umask 022;
   - an unwritable output directory returns 2 before the factory is called.
 - [x] 4.3 Map errors to exit codes (D7, R12, R20). After parsing, every `Exception` gives one
   `scanscribe: error:` line and 1; `KeyboardInterrupt` gives 130. The output is never created or

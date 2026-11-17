@@ -65,9 +65,10 @@ def resolve_output(input_path: Path, output: Path | None) -> Path:
     """Check the input and output paths before any page is read (R10).
 
     Returns the output path; raises `UsageError` for a missing input, an output that is a
-    directory, an output directory that is missing or not writable, or an output that is the
-    input. A path that can't be checked at all (no permission to look, a symlink loop) is a
-    usage error too, never a traceback (R12).
+    directory, an output directory that is missing or not writable, an output that is the input,
+    or an output inside a folder input whose name would be listed as a page. A path that can't
+    be checked at all (no permission to look, a symlink loop) is a usage error too, never a
+    traceback (R12).
     """
     try:
         return _check_paths(input_path, output)

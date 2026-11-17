@@ -28,6 +28,12 @@ def test_empty_last_page() -> None:
     )
 
 
+def test_empty_middle_page_is_followed_by_two_blank_lines() -> None:
+    assert format_pages([["a"], [], ["a"]]) == (
+        "--- Page 1 ---\na\n\n--- Page 2 ---\n\n\n--- Page 3 ---\na"
+    )
+
+
 # --- Default output path (R6, D5) ----------------------------------------------------------
 
 
