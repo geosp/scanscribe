@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import contextlib
 import os
+import secrets
 import stat
-import tempfile
 from pathlib import Path
 
 
@@ -32,10 +32,7 @@ def default_output_path(input_path: Path) -> Path:
     return input_path.with_suffix(".txt")
 
 
-def _umask_default_mode() -> int:
-    umask = os.umask(0)
-    os.umask(umask)
-    return 0o666 & ~umask
+_TEMP_ATTEMPTS = 100
 
 
 def write_atomic(path: Path, text: str) -> None:
@@ -43,21 +40,35 @@ def write_atomic(path: Path, text: str) -> None:
 
     The text goes to a temp file `.<name>.<random>.tmp` in the same directory, which gets the old
     file's mode (or the umask default) and is renamed onto `path` with `os.replace`. Any failure,
-    including Ctrl-C, deletes the temp file.
+    including Ctrl-C, deletes the temp file; a failed delete never hides the original error.
     """
     try:
-        mode = stat.S_IMODE(os.stat(path).st_mode)
+        old_mode: int | None = stat.S_IMODE(os.stat(path).st_mode)
     except FileNotFoundError:
-        mode = _umask_default_mode()
-    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+        old_mode = None
+    # O_EXCL with mode 0666 lets the kernel apply the umask, so the process umask never changes.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+    temp_name: Path | None = None
     try:
+        for _ in range(_TEMP_ATTEMPTS):
+            # Named before it is created, so a Ctrl-C right after creation still removes it.
+            temp_name = path.parent / f".{path.name}.{secrets.token_hex(4)}.tmp"
+            try:
+                fd = os.open(temp_name, flags, 0o666)
+                break
+            except FileExistsError:
+                temp_name = None
+        else:
+            raise FileExistsError(f"no free temp file name next to {path}")
         with os.fdopen(fd, "wb") as temp:
             temp.write(text.encode("utf-8"))
             temp.flush()
             os.fsync(temp.fileno())
-        os.chmod(temp_name, mode)
+        if old_mode is not None:
+            os.chmod(temp_name, old_mode)
         os.replace(temp_name, path)
     except BaseException:
-        with contextlib.suppress(FileNotFoundError):
-            os.unlink(temp_name)
+        if temp_name is not None:
+            with contextlib.suppress(OSError):
+                os.unlink(temp_name)
         raise
