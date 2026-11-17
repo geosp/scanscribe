@@ -253,10 +253,14 @@ def test_existing_output_is_replaced_and_keeps_its_mode(
     folder = fx.image_folder("book", {"p1.png": ["red"]})
     output = tmp_path / "out.txt"
     output.write_text("old text\n", encoding="utf-8")
-    output.chmod(0o644)
-    assert run([str(folder), "-o", str(output)], factory) == 0
+    output.chmod(0o600)  # differs from the umask-022 default of 0644
+    old_umask = os.umask(0o022)
+    try:
+        assert run([str(folder), "-o", str(output)], factory) == 0
+    finally:
+        os.umask(old_umask)
     assert output.read_text(encoding="utf-8") == "--- Page 1 ---\nred"
-    assert output.stat().st_mode & 0o777 == 0o644
+    assert output.stat().st_mode & 0o777 == 0o600
     assert temp_files(tmp_path) == []
 
 
