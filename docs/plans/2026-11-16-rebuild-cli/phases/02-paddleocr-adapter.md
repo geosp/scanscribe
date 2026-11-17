@@ -26,7 +26,7 @@ output with the prototype's on both devices.
   against the PaddleOCR and PaddlePaddle versions in `uv.lock`. Also find where the installed
   `paddlex` and `paddleocr` loggers and prints write (R11). Record any difference in notes.md
   and propose a plan `update` if a decision changes. Verify: notes.md names the versions checked.
-- [ ] 1.2 Add `src/scanscribe/paddle_engine.py`. It imports `paddle` and `paddleocr` at its top
+- [x] 1.2 Add `src/scanscribe/paddle_engine.py`. It imports `paddle` and `paddleocr` at its top
   (D2). It has `resolve_device(requested)` (R15, D3) and `PaddleOcrEngine(lang, device)`. The engine:
   - passes the prototype's three `use_*=False` flags;
   - adds `enable_mkldnn=False` only on `cpu*` (R17);
