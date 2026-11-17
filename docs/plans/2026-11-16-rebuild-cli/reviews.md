@@ -63,20 +63,20 @@ Diff base 7594141, reviewed commit 4d348a6. Reviewers: contract ✅ · failure a
 
 | ID | Sev | Lens | Finding | Resolution |
 | --- | --- | --- | --- | --- |
-| F45 | Major | contract, failure, scope | `resolve_output` errors other than `UsageError` (`PermissionError`, symlink-loop `RuntimeError`) escape `run` as a traceback (R10, R12, D7) | open |
-| F46 | Major | contract, scope | Keep-mode test uses 0644, the umask-022 default, so it can't see the old-mode branch (D6) | open |
-| F47 | Nit | contract, failure, scope | Ctrl-C during parsing or path checks prints a traceback (R20) | open |
-| F48 | Nit | contract, failure, scope | Ctrl-C between `mkstemp` and `try` leaves the temp file (R20) | open |
-| F49 | Nit | contract, failure, scope | Ctrl-C after `os.replace` returns 130 though the output changed (R20) | open |
-| F50 | Nit | contract, failure | `os.umask(0)` briefly changes the process umask (D6) | open |
-| F51 | Nit | failure | A failing cleanup `unlink` hides the original error (R12) | open |
-| F52 | Nit | failure | SIGKILL or power loss leaves a temp file; no directory fsync (D6) | open |
-| F53 | Nit | failure | A closed stderr pipe raises `BrokenPipeError` twice (R11, R12) | open |
-| F54 | Nit | failure, scope | Some write failures surface only after OCR (NAME_MAX, sticky dir, dir removed) (R10) | open |
-| F55 | Nit | failure, scope | `-o` naming a page inside the input folder overwrites it (R10) | open |
-| F56 | Nit | scope | Case-insensitive file systems defeat the output-is-input check (R10, D5) | open |
-| F57 | Nit | scope | An image changed between pre-check and OCR can give zero-width slices (D6) | open |
-| F58 | Nit | scope | PDF render failures happen mid-OCR; pre-check reads width only (R8) | open |
-| F59 | Nit | contract | Symlinks to images count as pages (R1) | open |
-| F60 | Nit | contract | Test gaps: temp/stdout asserts, "no page is read", non-ASCII UTF-8, truncated images at CLI level | open |
-| F61 | Nit | contract, failure, scope | Phases table shows 0/12 for phase 01 | open |
+| F45 | Major | contract, failure, scope | `resolve_output` errors other than `UsageError` (`PermissionError`, symlink-loop `RuntimeError`) escape `run` as a traceback (R10, R12, D7) | fixed: `test_input_in_an_unreadable_directory…`, `test_output_in_an_unreadable_directory…`, `test_output_that_is_a_symlink_loop…`; `cli.resolve_output` (b922c63) |
+| F46 | Major | contract, scope | Keep-mode test uses 0644, the umask-022 default, so it can't see the old-mode branch (D6) | fixed: `test_existing_output_is_replaced_and_keeps_its_mode` uses 0600 under umask 022 (f99c1a0) |
+| F47 | Nit | contract, failure, scope | Ctrl-C during parsing or path checks prints a traceback (R20) | fixed: `test_ctrl_c_during_the_path_check_exits_130`; `cli.run` (ad3329a) |
+| F48 | Nit | contract, failure, scope | Ctrl-C between `mkstemp` and `try` leaves the temp file (R20) | fixed: `test_interrupt_right_after_the_temp_file_is_created_removes_it`; `output.write_atomic` (dc3aeda) |
+| F49 | Nit | contract, failure, scope | Ctrl-C after `os.replace` returns 130 though the output changed (R20) | contested: the rename and the return can't be made atomic against a signal; the output is complete when it happens |
+| F50 | Nit | contract, failure | `os.umask(0)` briefly changes the process umask (D6) | fixed: `test_new_file_gets_the_umask_default_without_changing_the_umask`; O_EXCL with mode 0666 (dc3aeda) |
+| F51 | Nit | failure | A failing cleanup `unlink` hides the original error (R12) | fixed: `test_failed_cleanup_keeps_the_original_error`; cleanup suppresses `OSError` (dc3aeda) |
+| F52 | Nit | failure | SIGKILL or power loss leaves a temp file; no directory fsync (D6) | contested: R20 covers Ctrl-C only; hard kills and power loss are outside the contract |
+| F53 | Nit | failure | A closed stderr pipe raises `BrokenPipeError` twice (R11, R12) | contested: outside R11/R12's scope; a closed stderr pipe is rare for this CLI |
+| F54 | Nit | failure, scope | Some write failures surface only after OCR (NAME_MAX, sticky dir, dir removed) (R10) | contested: R10 lists the cases it checks; these are rare and fail with one R12 line |
+| F55 | Nit | failure, scope | `-o` naming a page inside the input folder overwrites it (R10) | fixed: R10 and Decision log (f34f9a9); `test_output_that_would_be_a_page_of_the_folder…`; `cli._check_paths` (39c0eeb) |
+| F56 | Nit | scope | Case-insensitive file systems defeat the output-is-input check (R10, D5) | fixed: `test_output_that_is_the_same_file_under_another_name…`; `os.path.samefile` (5d2980f) |
+| F57 | Nit | scope | An image changed between pre-check and OCR can give zero-width slices (D6) | contested: a file changed mid-run is unlikely; a corrupt replacement is still an input error and the output stays untouched |
+| F58 | Nit | scope | PDF render failures happen mid-OCR; pre-check reads width only (R8) | contested: D6 limits the PDF pre-check to the rendered width |
+| F59 | Nit | contract | Symlinks to images count as pages (R1) | contested: the prototype followed symlinks too, and a folder of symlinked pages is a legitimate use |
+| F60 | Nit | contract | Test gaps: temp/stdout asserts, "no page is read", non-ASCII UTF-8, truncated images at CLI level | fixed: `test_cli.py` autouse temp check, `pages_never_read`, empty stdout, truncated images end to end, UTF-8 bytes (2f583d8) |
+| F61 | Nit | contract, failure, scope | Phases table shows 0/12 for phase 01 | fixed: Phases table (f34f9a9) |
