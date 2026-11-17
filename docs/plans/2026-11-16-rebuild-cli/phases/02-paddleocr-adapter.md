@@ -1,12 +1,12 @@
 ---
 phase: 2
 title: PaddleOCR adapter and the scanscribe command
-status: approved
-branch: null
-base: null
+status: done
+branch: feat/4-paddleocr-adapter
+base: 75c67e03518cbeab009f00e7ca7c7a878d2c7fd4
 delivers: [R13, R14, R15, R16, R17, R18, R19]
 design_review: { status: passed, rounds: 3, last: 2026-11-16 }
-impl_review: { status: none, rounds: 0, last: null }
+impl_review: { status: passed, rounds: 1, last: 2026-11-16 }
 approved: 2026-11-16
 ---
 
@@ -22,11 +22,11 @@ output with the prototype's on both devices.
 
 ### 1. Adapter and loader
 
-- [ ] 1.1 Re-check the D3 and D4 source references ([notes.md](../notes.md#d3-device-detection-in-the-installed-paddle))
+- [x] 1.1 Re-check the D3 and D4 source references ([notes.md](../notes.md#d3-device-detection-in-the-installed-paddle))
   against the PaddleOCR and PaddlePaddle versions in `uv.lock`. Also find where the installed
   `paddlex` and `paddleocr` loggers and prints write (R11). Record any difference in notes.md
   and propose a plan `update` if a decision changes. Verify: notes.md names the versions checked.
-- [ ] 1.2 Add `src/scanscribe/paddle_engine.py`. It imports `paddle` and `paddleocr` at its top
+- [x] 1.2 Add `src/scanscribe/paddle_engine.py`. It imports `paddle` and `paddleocr` at its top
   (D2). It has `resolve_device(requested)` (R15, D3) and `PaddleOcrEngine(lang, device)`. The engine:
   - passes the prototype's three `use_*=False` flags;
   - adds `enable_mkldnn=False` only on `cpu*` (R17);
@@ -45,7 +45,7 @@ output with the prototype's on both devices.
     empty.
 
   `uv run mypy` passes on the base install.
-- [ ] 1.3 Add `load_engine(lang, device)` to `engine.py`. It imports `scanscribe.paddle_engine` inside the function with `importlib.import_module` (D2), so a
+- [x] 1.3 Add `load_engine(lang, device)` to `engine.py`. It imports `scanscribe.paddle_engine` inside the function with `importlib.import_module` (D2), so a
   test that cleared it gets a fresh import, and turns a `ModuleNotFoundError` for exactly `paddle` or
   `paddleocr` into `EngineMissingError`, an `InputError` with the R14 message. It then resolves the device and prints `Using device: <d>` to stderr before building `PaddleOCR`,
   so the line shows during a first-run model download (R16). Verify these tests:
@@ -53,7 +53,7 @@ output with the prototype's on both devices.
     install;
   - with fake modules, the device line appears before `Processing page 1...`;
   - an `ImportError` named `paddle.base.core` (a broken install) is not reported as a missing engine.
-- [ ] 1.4 Add `main()` (`sys.exit(run(sys.argv[1:], load_engine))`) and
+- [x] 1.4 Add `main()` (`sys.exit(run(sys.argv[1:], load_engine))`) and
   `[project.scripts] scanscribe = "scanscribe.cli:main"` (R19). Add the R13 tests:
   - a subprocess imports every scanscribe module except `paddle_engine`, then calls
     `run(["--help"], load_engine)`, which returns 0;
@@ -66,7 +66,7 @@ output with the prototype's on both devices.
 
 ### 2. Docs and checks
 
-- [ ] 2.1 Replace the README's "under construction" status with a Usage section covering:
+- [x] 2.1 Replace the README's "under construction" status with a Usage section covering:
   - the commands and options;
   - the output format;
   - the exit codes;
@@ -75,12 +75,12 @@ output with the prototype's on both devices.
   Add a line to `docs/decision-log.md` for the BGR change and the new edge-case behavior, and update
   the Status line in `AGENTS.md`. Verify:
   the lychee links job passes in CI.
-- [ ] 2.2 Run the AGENTS.md checks locally, then the suite once from a clean clone with only
+- [x] 2.2 Run the AGENTS.md checks locally, then the suite once from a clean clone with only
   `uv sync --locked`. Verify: all commands exit 0.
 
 ### 3. Manual OCR check (owner)
 
-- [ ] 3.1 Owner, GPU: run the prototype and `scanscribe` with the `gpu` extra on the same local
+- [x] 3.1 Owner, GPU: run the prototype and `scanscribe` with the `gpu` extra on the same local
   input, which includes at least one color page, following
   [notes.md#manual-check](../notes.md#manual-check). Read the differing lines locally, then press
   Ctrl-C once during a second run. Verify:
@@ -94,5 +94,5 @@ output with the prototype's on both devices.
 
   The PR records the device line (`gpu:0`), page count, run time and the number of differing lines,
   with no book text.
-- [ ] 3.2 Owner, CPU: repeat 3.1 with the `cpu` extra. Verify: the device line reads `cpu`, there is
+- [x] 3.2 Owner, CPU: repeat 3.1 with the `cpu` extra. Verify: the device line reads `cpu`, there is
   no oneDNN error, the same checks hold, and the PR records the same facts.

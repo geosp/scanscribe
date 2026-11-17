@@ -4,6 +4,7 @@ Decisions about constraints, the CLI, the output format, tooling and process tha
 
 | Date | Decision | Reason |
 | --- | --- | --- |
+| 2026-11-16 | Pass page images to PaddleOCR as BGR; reject empty inputs, `--columns`/`--dpi` below 1 and unusable output paths before OCR; skip hidden files; name a folder's output after the whole folder name; replace the output atomically | PaddleOCR reads NumPy arrays as BGR, and the prototype passed RGB. The edge-case rules stop failures after hours of OCR. Details: `docs/plans/2026-11-16-rebuild-cli/` (D4, R5-R10, D6). |
 | 2026-11-16 | Add the Claude Code deny list (`.claude/settings.json`) in the first commit, before any other agent tooling | Guardrails should exist before agents work in the repository; the setup guide lists them last. |
 | 2026-11-16 | Book material (PDFs, page images, OCR text of books) never enters Git, fixtures, review reports or logs; `in/` and `out/` are ignored | The inputs are usually copyrighted. Tests use small generated or self-made images. |
 | 2026-11-16 | Commits use the owner's GitHub noreply address, set in the repository's local Git config | The repository is public; this keeps a personal address out of its history. |

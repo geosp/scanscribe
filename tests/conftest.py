@@ -8,7 +8,9 @@ tests need no real OCR.
 from __future__ import annotations
 
 import random
-from collections.abc import Callable, Sequence
+import sys
+import types
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -17,6 +19,10 @@ import pypdfium2 as pdfium
 import pytest
 from numpy.typing import NDArray
 from PIL import Image
+
+import scanscribe
+
+pytest_plugins = ["pytester"]
 
 PALETTE: dict[str, tuple[int, int, int]] = {
     "red": (255, 0, 0),
@@ -179,3 +185,92 @@ def make_factory() -> Callable[..., FakeFactory]:
         return FakeFactory(engine=FakeEngine(**engine_kwargs))
 
     return make
+
+
+# --- Fake Paddle modules (phase 02) --------------------------------------------------------
+
+
+@dataclass
+class FakePaddle:
+    """Controls and records the fake `paddle` and `paddleocr` modules."""
+
+    cuda: bool = True
+    gpus: int = 1
+    results: list[dict[str, object]] = field(default_factory=lambda: [{"rec_texts": ["fake line"]}])
+    chatter: bool = False
+    """When True, the fake PaddleOCR prints to stdout while built and in `predict`."""
+    created: list[dict[str, object]] = field(default_factory=list)
+    inputs: list[NDArray[np.uint8]] = field(default_factory=list)
+
+
+def _forget_adapter() -> None:
+    sys.modules.pop("scanscribe.paddle_engine", None)
+    if hasattr(scanscribe, "paddle_engine"):
+        delattr(scanscribe, "paddle_engine")
+
+
+@pytest.fixture
+def fake_paddle(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakePaddle]:
+    """Installs fake `paddle` and `paddleocr` modules and a fresh adapter import.
+
+    The adapter is forgotten before and after each test, from `sys.modules` and from the package
+    attribute, so no test sees a module bound to another test's fakes.
+    """
+    state = FakePaddle()
+
+    paddle = types.ModuleType("paddle")
+    paddle.device = types.SimpleNamespace(
+        is_compiled_with_cuda=lambda: state.cuda,
+        cuda=types.SimpleNamespace(device_count=lambda: state.gpus),
+    )
+
+    class FakePaddleOCR:
+        def __init__(self, **kwargs: object) -> None:
+            if state.chatter:
+                print("Creating model: fake")
+            state.created.append(kwargs)
+
+        def predict(self, image: NDArray[np.uint8]) -> list[dict[str, object]]:
+            if state.chatter:
+                print("predicting")
+            state.inputs.append(image)
+            return state.results
+
+    paddleocr = types.ModuleType("paddleocr")
+    paddleocr.PaddleOCR = FakePaddleOCR
+
+    _forget_adapter()
+    monkeypatch.setitem(sys.modules, "paddle", paddle)
+    monkeypatch.setitem(sys.modules, "paddleocr", paddleocr)
+    yield state
+    _forget_adapter()
+
+
+@pytest.fixture
+def no_paddle(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Makes `import paddle` and `import paddleocr` fail, whatever is installed (R14)."""
+    _forget_adapter()
+    monkeypatch.setitem(sys.modules, "paddle", None)
+    monkeypatch.setitem(sys.modules, "paddleocr", None)
+    yield
+    _forget_adapter()
+
+
+# --- No real Paddle (R13) ------------------------------------------------------------------
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Fail the run if any test imported the real `paddle` or `paddleocr` (R13).
+
+    Fakes are removed after each test, so anything left in `sys.modules` is real. This sets the
+    exit status instead of asserting, which pytest would report as an internal error.
+    """
+    leaked = sorted(name for name in ("paddle", "paddleocr") if sys.modules.get(name) is not None)
+    if leaked:
+        reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+        message = f"R13: the test run imported the real {', '.join(leaked)}"
+        if reporter is not None:
+            reporter.write_line(message, red=True)
+        else:
+            print(message, file=sys.stderr)
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED

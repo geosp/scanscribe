@@ -8,7 +8,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from scanscribe.engine import EngineFactory, ScanscribeError, UsageError
+from scanscribe.engine import EngineFactory, ScanscribeError, UsageError, load_engine
 from scanscribe.output import default_output_path, format_pages, write_atomic
 from scanscribe.pages import is_page_name, open_source, split_columns
 
@@ -189,3 +189,8 @@ def _run(argv: Sequence[str], engine_factory: EngineFactory) -> int:
         _error(_one_line(exc))
         return 1
     return 0
+
+
+def main() -> None:
+    """The `scanscribe` console command (R19)."""
+    sys.exit(run(sys.argv[1:], load_engine))
