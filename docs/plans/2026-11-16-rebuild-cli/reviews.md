@@ -57,3 +57,26 @@ Reviewers: fresh reader ✅ · codebase fit ✅ · zoom out ✅ (commit d5f1a46;
 | F44 | Nit | fresh reader | Small wording gaps: rename drawn on the per-page line, R11 vs `--help` on stdout, R4 half rounding, "PP-OCRv6"/"locked version", "hidden", 5.13.0's meaning, D4 causality, the Risks arrow, R10's two "before" points | fixed: Summary diagram, Terms, R1, R4, R10, R11, D4, D8, Risks |
 
 ## 2026-11-16 · approved · plan (phases 01 and 02)
+
+## 2026-11-16 · impl-review · phase 01 · round 1 · changes-requested
+Diff base 7594141, reviewed commit 4d348a6. Reviewers: contract ✅ · failure and retry ✅ · scope and composition ✅ (summary in docs/reviews/2026-11-16-rebuild-cli/impl-review-phase-01-round-01.md; reports in raw/)
+
+| ID | Sev | Lens | Finding | Resolution |
+| --- | --- | --- | --- | --- |
+| F45 | Major | contract, failure, scope | `resolve_output` errors other than `UsageError` (`PermissionError`, symlink-loop `RuntimeError`) escape `run` as a traceback (R10, R12, D7) | open |
+| F46 | Major | contract, scope | Keep-mode test uses 0644, the umask-022 default, so it can't see the old-mode branch (D6) | open |
+| F47 | Nit | contract, failure, scope | Ctrl-C during parsing or path checks prints a traceback (R20) | open |
+| F48 | Nit | contract, failure, scope | Ctrl-C between `mkstemp` and `try` leaves the temp file (R20) | open |
+| F49 | Nit | contract, failure, scope | Ctrl-C after `os.replace` returns 130 though the output changed (R20) | open |
+| F50 | Nit | contract, failure | `os.umask(0)` briefly changes the process umask (D6) | open |
+| F51 | Nit | failure | A failing cleanup `unlink` hides the original error (R12) | open |
+| F52 | Nit | failure | SIGKILL or power loss leaves a temp file; no directory fsync (D6) | open |
+| F53 | Nit | failure | A closed stderr pipe raises `BrokenPipeError` twice (R11, R12) | open |
+| F54 | Nit | failure, scope | Some write failures surface only after OCR (NAME_MAX, sticky dir, dir removed) (R10) | open |
+| F55 | Nit | failure, scope | `-o` naming a page inside the input folder overwrites it (R10) | open |
+| F56 | Nit | scope | Case-insensitive file systems defeat the output-is-input check (R10, D5) | open |
+| F57 | Nit | scope | An image changed between pre-check and OCR can give zero-width slices (D6) | open |
+| F58 | Nit | scope | PDF render failures happen mid-OCR; pre-check reads width only (R8) | open |
+| F59 | Nit | contract | Symlinks to images count as pages (R1) | open |
+| F60 | Nit | contract | Test gaps: temp/stdout asserts, "no page is read", non-ASCII UTF-8, truncated images at CLI level | open |
+| F61 | Nit | contract, failure, scope | Phases table shows 0/12 for phase 01 | open |
