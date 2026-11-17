@@ -119,6 +119,20 @@ def test_input_named_txt_would_overwrite_itself_by_default(
     assert "output would overwrite the input" in capsys.readouterr().err
 
 
+def test_output_that_is_the_same_file_under_another_name_is_a_usage_error(
+    fx: Fixtures, factory: FakeFactory, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A hard link stands in for BOOK.PDF vs book.pdf on a case-insensitive file system.
+    pdf = fx.red_pdf("book.pdf")
+    alias = pdf.with_name("alias.pdf")
+    os.link(pdf, alias)
+    before = pdf.read_bytes()
+    assert run([str(pdf), "-o", str(alias)], factory) == 2
+    assert "output would overwrite the input" in capsys.readouterr().err
+    assert factory.calls == []
+    assert pdf.read_bytes() == before
+
+
 def assert_usage_error(err: str, contains: str) -> None:
     assert "Traceback" not in err
     assert err.startswith("usage: scanscribe")

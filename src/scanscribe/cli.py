@@ -87,7 +87,11 @@ def _check_paths(input_path: Path, output: Path | None) -> Path:
         raise UsageError(f"output directory does not exist: {directory}")
     if not os.access(directory, os.W_OK | os.X_OK):
         raise UsageError(f"output directory is not writable: {directory}")
-    if output.resolve() == input_path.resolve():
+    # samefile also catches another name for the same file, such as BOOK.PDF for book.pdf on a
+    # case-insensitive file system.
+    if output.resolve() == input_path.resolve() or (
+        output.exists() and os.path.samefile(output, input_path)
+    ):
         raise UsageError(f"output would overwrite the input: {output}")
     return output
 
