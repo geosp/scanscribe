@@ -75,7 +75,7 @@ output with the prototype's on both devices.
   Add a line to `docs/decision-log.md` for the BGR change and the new edge-case behavior, and update
   the Status line in `AGENTS.md`. Verify:
   the lychee links job passes in CI.
-- [ ] 2.2 Run the AGENTS.md checks locally, then the suite once from a clean clone with only
+- [x] 2.2 Run the AGENTS.md checks locally, then the suite once from a clean clone with only
   `uv sync --locked`. Verify: all commands exit 0.
 
 ### 3. Manual OCR check (owner)
