@@ -41,6 +41,22 @@ paddlepaddle-gpu 3.3.1, pypdfium2 5.13.0. scanscribe's `uv.lock` has pypdfium2 5
 
 Re-check these paths against the version in `uv.lock` when phase 02 starts.
 
+**Re-checked 2026-11-16 (phase 02 task 1.1)** against paddleocr 3.7.0, paddlex 3.7.2 and
+paddlepaddle-gpu 3.3.1, the versions in `uv.lock`, read in the prototype's environment:
+
+- D3 holds. `get_default_device()` is now at `paddlex/utils/device.py:55-62`; `device_count()` is at
+  `paddle/device/cuda/__init__.py:165`; `enable_mkldnn` is read at `paddleocr/_common_args.py:91`;
+  `DEFAULT_ENABLE_MKLDNN = True` is at `paddleocr/_constants.py:18`.
+- D4 holds. `ReadImage(format="BGR")` is at `paddlex/inference/pipelines/ocr/pipeline.py:148`; the
+  NumPy branch of `read()` is at `paddlex/inference/common/reader/image_reader.py:51-55`.
+- Output streams (R11): PaddleX's logger writes through `logging.StreamHandler(sys.stderr)`
+  (`paddlex/utils/logging.py:138`). PaddleOCR's logger uses `logging.StreamHandler()`, which defaults to
+  stderr (`paddleocr/_utils/logging.py:32`). Model downloads print progress to stderr
+  (`paddlex/utils/download.py:42-49`). Nothing on the OCR path prints to stdout from Python. The
+  adapter still redirects stdout to stderr around construction and `predict`, as a cheap guard; a
+  native write to file descriptor 1 would escape it, and the manual check's empty-stdout test would
+  catch that.
+
 ## D4: PaddleOCR reads arrays as BGR
 
 - `paddlex/inference/pipelines/ocr/pipeline.py:148`: the OCR pipeline builds

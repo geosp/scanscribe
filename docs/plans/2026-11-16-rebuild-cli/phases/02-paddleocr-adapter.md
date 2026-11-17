@@ -22,7 +22,7 @@ output with the prototype's on both devices.
 
 ### 1. Adapter and loader
 
-- [ ] 1.1 Re-check the D3 and D4 source references ([notes.md](../notes.md#d3-device-detection-in-the-installed-paddle))
+- [x] 1.1 Re-check the D3 and D4 source references ([notes.md](../notes.md#d3-device-detection-in-the-installed-paddle))
   against the PaddleOCR and PaddlePaddle versions in `uv.lock`. Also find where the installed
   `paddlex` and `paddleocr` loggers and prints write (R11). Record any difference in notes.md
   and propose a plan `update` if a decision changes. Verify: notes.md names the versions checked.
