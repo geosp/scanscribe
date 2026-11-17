@@ -81,6 +81,18 @@ On the CPU the run stops only when the page in progress finishes. Python can't a
 
 A first attempt sent SIGINT with `kill -INT -- -PID` from a script without job control. The PID didn't lead a process group, so no process received the signal and the run completed normally. This was a fault in the test harness: sending SIGINT inside the process raised `KeyboardInterrupt` at once, and the corrected harness above uses `set -m`.
 
+## 4. Tests and types with an extra installed
+
+R13 promises that the test suite never imports the real Paddle, even when it is installed. CI runs the base install, where it can't be imported at all, so the check only means something with an extra installed. Run at `bdd1039`:
+
+| Install | `uv run pytest` | Session-end check (real Paddle imported?) | `uv run mypy` |
+| --- | --- | --- | --- |
+| `--extra gpu` (`paddlepaddle-gpu` 3.3.1) | 150 passed | no leak reported | no issues |
+| `--extra cpu` (`paddlepaddle` 3.3.1) | 150 passed | no leak reported | no issues |
+| base (`uv sync --locked`) | 150 passed | no leak reported | no issues |
+
+`tests/test_entry_point.py` also runs a small inner pytest session that leaves a stand-in `paddle` module behind, and checks that the session-end check then fails the run.
+
 ## Not covered
 
 - **PDF input.** The PDF path also changes pypdfium2 (5.13.0 to 5.15.2), so the plan uses an image folder to isolate D4. PDF rendering is covered by the unit tests.

@@ -112,3 +112,19 @@ Reopened by the R10 change from impl review F55. Reviewers: fresh reader ✅ · 
 
 ## 2026-11-16 · waiver · phase 01 · impl-review re-check
 The owner waived the fresh-reviewer re-check of the round 1 fixes (docs/reviews/README.md rule 6): "Is time to implement. Too many reviews." Every round 1 Major (F45, F46) was fixed test first with a mutation check; all three reviewers had completed. impl_review set to passed.
+
+## 2026-11-16 · impl-review · phase 02 · round 1 · passed
+Diff base 75c67e0, reviewed commit 6fabbf3. Reviewers: contract ✅ (the owner chose one reviewer, the contract lens; report in docs/reviews/2026-11-16-rebuild-cli/raw/impl-review-phase-02-round-01-contract.md). The two Majors were fixed after the round.
+
+| ID | Sev | Lens | Finding | Resolution |
+| --- | --- | --- | --- | --- |
+| F85 | Major | contract | No recorded pytest or mypy run with an extra installed, the only setup where R13 can fail (R13, task 3.1) | fixed: ran both extras, 150 passed, mypy clean, no leak; docs/demos/2026-11-16-ocr-check/README.md section 4 |
+| F86 | Major | contract | The session-end check is never tested (R13, task 1.4) | fixed: `test_session_check_fails_a_run_that_imported_paddle` (pytester, mutation-checked) (bdd1039) |
+| F87 | Nit | contract | The owner didn't read the differing lines; the agent used a letter edit-distance check (task 3.1) | accepted: the owner delegated the check; edit distance 0 rules out wrong words |
+| F88 | Nit | contract | Manual-check facts are in a committed doc, not yet in the PR (task 3.1) | accepted: the PR description will link the demo when PR #7 is updated |
+| F89 | Nit | contract | The fake PaddleOCR prints but doesn't log to stdout (task 1.2) | accepted: Paddle's loggers write to stderr (notes.md D3 re-check) |
+| F90 | Nit | contract | Paddle's import and `resolve_device` run outside the stdout redirect (R11) | accepted: no import-time prints found; real runs showed 0 bytes on stdout |
+| F91 | Nit | contract | `--device ""` is treated as not given (R15) | accepted: an empty device isn't a usable value |
+| F92 | Nit | contract | The subprocess R13 test lists modules by hand (task 1.4) | accepted: matches every current module; revisit when one is added |
+| F93 | Nit | contract | The broken-install test mocks `import_module` rather than a real native failure (task 1.3) | accepted: it tests the `exc.name` filter, which is the rule |
+| F94 | Nit | contract | No test runs the installed console script (R19) | accepted: the manual check ran `.venv/bin/scanscribe` on both builds |
