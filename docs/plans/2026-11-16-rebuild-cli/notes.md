@@ -116,20 +116,23 @@ committed), once with each extra:
 
 ```bash
 # outputs go to out/, which Git ignores
-# prototype (its GPU build; add --device cpu for the CPU comparison)
-IN=/absolute/path/to/input   # a PDF or folder with at least one color page; absolute, because of the cd
-(cd ../ocr-pdf && uv run ocr-pdf "$IN" -o ../scanscribe/out/proto.txt)
+# prototype, once per device, each into its own baseline
+IN=/absolute/path/to/folder  # page images with at least one color page; absolute, because of the cd
+(cd ../ocr-pdf && uv run ocr-pdf "$IN" -o ../scanscribe/out/proto-gpu.txt)
+(cd ../ocr-pdf && uv run ocr-pdf "$IN" --device cpu -o ../scanscribe/out/proto-cpu.txt)
 # scanscribe, once per extra; stdout must stay empty
 uv sync --extra gpu && uv run scanscribe "$IN" -o out/gpu.txt > out/gpu.stdout && test ! -s out/gpu.stdout
 uv sync --extra cpu && uv run scanscribe "$IN" -o out/cpu.txt > out/cpu.stdout && test ! -s out/cpu.stdout
-diff out/proto.txt out/gpu.txt | grep -c '^[<>]'   # a count only; never paste book lines
+diff out/proto-gpu.txt out/gpu.txt | grep -c '^[<>]'   # a count only; never paste book lines
+diff out/proto-cpu.txt out/cpu.txt | grep -c '^[<>]'
 ```
 
 Pass rule: the owner reads the differing lines locally. A page reads worse when a word the
 prototype got right is wrong in scanscribe's output. Such a page gets its own issue (described, not
 quoted), and phase 02 stays blocked until the owner either reverses D4 through a plan update or
-accepts the result. A grayscale-only input can't show the D4 effect, so the input includes at
-least one color page (for example, a highlighted or sepia screenshot).
+accepts the result. A grayscale-only input can't show the D4 effect, so the input includes at least one color page (for example, a highlighted or sepia screenshot). Use a
+folder of page images: a PDF also goes through the newer pypdfium2, so its diff wouldn't measure D4
+alone.
 
 Then start one more run on each device and press Ctrl-C during page 2 or later: it must exit 130,
 leave any existing output unchanged, and leave no `.*.tmp` file behind.

@@ -57,3 +57,58 @@ Reviewers: fresh reader ✅ · codebase fit ✅ · zoom out ✅ (commit d5f1a46;
 | F44 | Nit | fresh reader | Small wording gaps: rename drawn on the per-page line, R11 vs `--help` on stdout, R4 half rounding, "PP-OCRv6"/"locked version", "hidden", 5.13.0's meaning, D4 causality, the Risks arrow, R10's two "before" points | fixed: Summary diagram, Terms, R1, R4, R10, R11, D4, D8, Risks |
 
 ## 2026-11-16 · approved · plan (phases 01 and 02)
+
+## 2026-11-16 · impl-review · phase 01 · round 1 · changes-requested
+Diff base 7594141, reviewed commit 4d348a6. Reviewers: contract ✅ · failure and retry ✅ · scope and composition ✅ (summary in docs/reviews/2026-11-16-rebuild-cli/impl-review-phase-01-round-01.md; reports in raw/)
+
+| ID | Sev | Lens | Finding | Resolution |
+| --- | --- | --- | --- | --- |
+| F45 | Major | contract, failure, scope | `resolve_output` errors other than `UsageError` (`PermissionError`, symlink-loop `RuntimeError`) escape `run` as a traceback (R10, R12, D7) | fixed: `test_input_in_an_unreadable_directory…`, `test_output_in_an_unreadable_directory…`, `test_output_that_is_a_symlink_loop…`; `cli.resolve_output` (b922c63) |
+| F46 | Major | contract, scope | Keep-mode test uses 0644, the umask-022 default, so it can't see the old-mode branch (D6) | fixed: `test_existing_output_is_replaced_and_keeps_its_mode` uses 0600 under umask 022 (f99c1a0) |
+| F47 | Nit | contract, failure, scope | Ctrl-C during parsing or path checks prints a traceback (R20) | fixed: `test_ctrl_c_during_the_path_check_exits_130`; `cli.run` (ad3329a) |
+| F48 | Nit | contract, failure, scope | Ctrl-C between `mkstemp` and `try` leaves the temp file (R20) | fixed: `test_interrupt_right_after_the_temp_file_is_created_removes_it`; `output.write_atomic` (dc3aeda) |
+| F49 | Nit | contract, failure, scope | Ctrl-C after `os.replace` returns 130 though the output changed (R20) | contested: the rename and the return can't be made atomic against a signal; the output is complete when it happens |
+| F50 | Nit | contract, failure | `os.umask(0)` briefly changes the process umask (D6) | fixed: `test_new_file_gets_the_umask_default_without_changing_the_umask`; O_EXCL with mode 0666 (dc3aeda) |
+| F51 | Nit | failure | A failing cleanup `unlink` hides the original error (R12) | fixed: `test_failed_cleanup_keeps_the_original_error`; cleanup suppresses `OSError` (dc3aeda) |
+| F52 | Nit | failure | SIGKILL or power loss leaves a temp file; no directory fsync (D6) | contested: R20 covers Ctrl-C only; hard kills and power loss are outside the contract |
+| F53 | Nit | failure | A closed stderr pipe raises `BrokenPipeError` twice (R11, R12) | contested: outside R11/R12's scope; a closed stderr pipe is rare for this CLI |
+| F54 | Nit | failure, scope | Some write failures surface only after OCR (NAME_MAX, sticky dir, dir removed) (R10) | contested: R10 lists the cases it checks; these are rare and fail with one R12 line |
+| F55 | Nit | failure, scope | `-o` naming a page inside the input folder overwrites it (R10) | fixed: R10 and Decision log (f34f9a9); `test_output_that_would_be_a_page_of_the_folder…`; `cli._check_paths` (39c0eeb) |
+| F56 | Nit | scope | Case-insensitive file systems defeat the output-is-input check (R10, D5) | fixed: `test_output_that_is_the_same_file_under_another_name…`; `os.path.samefile` (5d2980f) |
+| F57 | Nit | scope | An image changed between pre-check and OCR can give zero-width slices (D6) | contested: a file changed mid-run is unlikely; a corrupt replacement is still an input error and the output stays untouched |
+| F58 | Nit | scope | PDF render failures happen mid-OCR; pre-check reads width only (R8) | contested: D6 limits the PDF pre-check to the rendered width |
+| F59 | Nit | contract | Symlinks to images count as pages (R1) | contested: the prototype followed symlinks too, and a folder of symlinked pages is a legitimate use |
+| F60 | Nit | contract | Test gaps: temp/stdout asserts, "no page is read", non-ASCII UTF-8, truncated images at CLI level | fixed: `test_cli.py` autouse temp check, `pages_never_read`, empty stdout, truncated images end to end, UTF-8 bytes (2f583d8) |
+| F61 | Nit | contract, failure, scope | Phases table shows 0/12 for phase 01 | fixed: Phases table (f34f9a9) |
+
+## 2026-11-16 · design-review · plan · round 3 · changes-requested
+Reopened by the R10 change from impl review F55. Reviewers: fresh reader ✅ · codebase fit ✅ · zoom out ✅ (commit 3131345; reports in docs/reviews/2026-11-16-rebuild-cli/raw/design-review-03-*.md). Closed findings not repeated: the plan.md line budget (F20, accepted); multi-rule requirements (F22, contested) are logged once more as F69 and F76 because the reviewer rated one Major.
+
+| ID | Sev | Lens | Finding | Resolution |
+| --- | --- | --- | --- | --- |
+| F62 | Major | codebase fit, zoom out | R11 relies on Paddle not writing to stdout; no phase 02 task checks where the `paddlex`/`paddleocr` loggers write or routes them to stderr (R11; phase 02 1.1, 1.2) | fixed: phase 02 1.1, 1.2 (logger check, stderr routing, fake-module test) |
+| F63 | Major | codebase fit | Clearing `sys.modules` isn't enough: `from scanscribe import paddle_engine` returns the stale package attribute, so R14 and device tests depend on order (phase 02 1.2, 1.3; Risks) | fixed: phase 02 1.2 (fixture removes the package attribute), 1.3 (`importlib.import_module`) |
+| F64 | Major | codebase fit | No task runs `pytest` with an extra installed, so R13's "machine with an extra" scenario is never exercised (R13; phase 02 2.2, 3.1, 3.2) | fixed: phase 02 3.1 (pytest and mypy with the extra; 3.2 repeats it) |
+| F65 | Major | fresh reader | "Five behaviors break parity" can't be checked: the plan never says which other new behaviors (R5, R10–R12, R15, R16, R20, D6) only add to the prototype (Summary, What changes) | fixed: What changes (additions bullet) |
+| F66 | Major | fresh reader | Ctrl-C has no stated mechanism: D7 catches `Exception`, which excludes `KeyboardInterrupt`; message and `SCANSCRIBE_DEBUG` behavior unstated (R20, D7) | fixed: D7 (`KeyboardInterrupt` around the whole run) |
+| F67 | Major | fresh reader | R3 doesn't settle whether an empty page that isn't last is followed by two blank lines (R3) | fixed: R3 second scenario; phase 01 3.1; `test_empty_middle_page_is_followed_by_two_blank_lines` |
+| F68 | Major | fresh reader | PDF pre-check: whether "rendered width" means rendering twice or computing it, and that a render failure surfaces only during OCR, is unstated (R5, R8, D6) | fixed: D6 step 3 |
+| F69 | Major | fresh reader | R8 holds two rules: unreadable pages and failures during OCR | contested: same as F22; each requirement states one rule with its conditions |
+| F70 | Major | fresh reader | D1 names `cli.main()` and `load_engine`, but nothing says they arrive in phase 02 (D1, Phases) | fixed: D1 |
+| F71 | Major | fresh reader | The manual check that gates the main risk is described only in notes.md (Summary, Risks) | contested: the plan states the pass rule; the procedure belongs in notes.md (F10, F31) |
+| F72 | Nit | fresh reader | Summary says the manual check "blocks phase 02"; Risks says the owner can lift it (Summary) | fixed: Summary |
+| F73 | Nit | fresh reader | Terms used but not defined: "the R12 line", "F55", `study-book-chapter`, "PP-OCRv6", the AGENTS.md Status line, phase task references | accepted: terms are explained where they are defined (notes, phase files) or are self-evident in context |
+| F74 | Nit | fresh reader | D5's title says "resolved input name" but the file rule uses unresolved `with_suffix`; R10 doesn't say it covers the default output (D5, R10) | fixed: D5 title; R10 (given or default) |
+| F75 | Nit | fresh reader | R10 doesn't say how writability is checked; the mode kept for a symlink output is ambiguous (R10, Assumptions) | contested: phase 01 4.1 names `os.access`; the symlink case is listed under Assumptions |
+| F76 | Nit | fresh reader | Readability: R1, R10, R4 long sentences; R5, R6, R7, R11 hold two rules; D1, D4, D9, Risks need rereading; BGR and MKL-DNN restated | contested: same as F22 |
+| F77 | Nit | codebase fit | Task 4.2 still says "an existing 0644 output keeps its mode"; the test now uses 0600 (phase 01 4.2) | fixed: phase 01 4.2 |
+| F78 | Nit | codebase fit | A bare `assert` in `pytest_sessionfinish` gives INTERNALERROR, not a failure (phase 02 1.4) | fixed: phase 02 1.4 |
+| F79 | Nit | codebase fit | Not stated whether `Using device:` prints before `PaddleOCR(...)` is built (phase 02 1.3, R16) | fixed: phase 02 1.3 |
+| F80 | Nit | codebase fit | `resolve_output` docstring omits the page-of-folder rule (`cli.py`) | fixed: `cli.resolve_output` docstring |
+| F81 | Nit | zoom out | The CPU comparison overwrites the GPU baseline `out/proto.txt` (notes Manual check; phase 02 3.2) | fixed: notes Manual check (separate GPU and CPU baselines) |
+| F82 | Nit | zoom out | A PDF diff also measures the pypdfium2 upgrade; the colour page should come from an image folder (Risks) | fixed: Risks; notes Manual check (image-folder input) |
+| F83 | Nit | zoom out | On the base install, R14's message appears only after the whole pre-check decodes every image (R14) | accepted: the wait is the pre-check's decode time, seconds per few hundred pages |
+| F84 | Nit | zoom out | mypy is checked only on the base install; an extra's `py.typed` could change the result locally (phase 02 1.2) | fixed: phase 02 3.1 (with F64) |
+
+## 2026-11-16 · waiver · phase 01 · impl-review re-check
+The owner waived the fresh-reviewer re-check of the round 1 fixes (docs/reviews/README.md rule 6): "Is time to implement. Too many reviews." Every round 1 Major (F45, F46) was fixed test first with a mutation check; all three reviewers had completed. impl_review set to passed.

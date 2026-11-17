@@ -1,9 +1,9 @@
 ---
 title: Rebuild the scanscribe CLI from the ocr-pdf prototype
-status: approved
+status: in-progress
 created: 2026-11-16
 updated: 2026-11-16
-design_review: { status: passed, rounds: 2, last: 2026-11-16 }
+design_review: { status: passed, rounds: 3, last: 2026-11-16 }
 approved: 2026-11-16
 adr_review: null
 ---
@@ -23,8 +23,7 @@ them.
 
 Phase 01 builds the pipeline and the CLI against a fake engine. Phase 02 adds the PaddleOCR adapter,
 the `scanscribe` command and the owner's manual check on GPU and CPU. The main risk is that the BGR
-fix changes the OCR text. The manual check blocks phase 02 if any page reads worse than the
-prototype's.
+fix changes the OCR text. The manual check blocks phase 02 if any page reads worse than the prototype's, until the owner reverses D4 or accepts the result.
 
 ```text
 validate args and paths (R9, R10) ─▶ list pages (R1, R2) ─▶ pre-check pages and widths (R5, R7, R8)
@@ -52,7 +51,10 @@ extras are now in place, so the CLI comes next. The full behavior inventory is i
   - `--columns` or `--dpi` below 1 are rejected (R9);
   - empty inputs are errors (R7);
   - hidden files are skipped (R1);
-  - `Vol.2/` writes `Vol.2.txt` (R6).
+    - `Vol.2/` writes `Vol.2.txt` (R6).
+- Additions that leave the prototype's options and successful output as they were: errors as one
+  stderr line (R12), exit codes 2, 1 and 130 (D7, R20), path and page checks before OCR (R5, R10),
+  the printed device (R15, R16) and the atomic output write (D6). Progress was already on stderr.
 - The README gains a Usage section. `pyproject.toml` gains the script entry and mypy overrides.
 
 ### Non-goals
@@ -103,6 +105,7 @@ A file input is opened as a PDF, and each page is rendered at `--dpi` (default 2
 
 Each page is the line `--- Page N ---` and a newline, then its lines joined by newlines; pages are joined by one blank line, and the file is UTF-8.
 - **Given** page 1 with lines `a` and `b`, and page 2 with no lines, **when** the run finishes, **then** the file is exactly `--- Page 1 ---\na\nb\n\n--- Page 2 ---\n`.
+- **Given** pages 1 and 3 with the line `a` and page 2 with no lines, **when** the run finishes, **then** the file is exactly `--- Page 1 ---\na\n\n--- Page 2 ---\n\n\n--- Page 3 ---\na`, as in the prototype.
 
 ### R4 · Columns are read left to right
 
@@ -141,10 +144,11 @@ A `--columns` or `--dpi` value below 1 is a usage error.
 
 ### R10 · Bad input or output paths are usage errors
 
-A missing input, an output that is an existing directory, an output directory that is missing or not writable, or an output that resolves to the input is a usage error, raised before any page is read.
+A missing input, an output that is an existing directory, an output directory that is missing or not writable, an output (given or default) that resolves to the input, or, for a folder input, an output inside that folder whose name R1 would list as a page is a usage error, raised before any page is read.
 - **Given** `-o missing-dir/out.txt`, or `-o out` where `out/` is a directory, **when** the command runs, **then** it exits 2 and no page is read.
 - **Given** an output directory without write permission, **when** the command runs, **then** it exits 2 and no page is read.
 - **Given** `-o book.pdf` for the input `book.pdf`, **when** the command runs, **then** it exits 2 and the PDF is untouched.
+- **Given** `-o book/p1.png` for the folder `book`, **when** the command runs, **then** it exits 2 and `p1.png` is untouched.
 
 ### R11 · Progress goes to stderr, never stdout
 
@@ -208,7 +212,7 @@ An interrupted run exits 130 with one `scanscribe: error:` line, and the output 
 `OcrEngine` is a `typing.Protocol` with one method, `recognize(image) -> list[str]`, which takes an
 RGB slice. `cli.run(argv, engine_factory)` in `cli.py` takes a factory `(lang, device) -> OcrEngine`.
 Tests pass the fake engine. `cli.main()` passes `engine.load_engine` (D2), which also chooses and prints the device
-(R15, R16), so `cli.run` never touches Paddle. Rejected: an abstract base class (the fake would have
+(R15, R16), so `cli.run` never touches Paddle. Phase 02 adds `cli.main()` and `load_engine`; phase 01 has only `cli.run`. Rejected: an abstract base class (the fake would have
 to inherit from it for no gain); passing PaddleOCR's result objects through (that would tie the
 tests to Paddle's result shape).
 
@@ -235,7 +239,7 @@ images through Pillow's `convert("RGB")`, PDF pages through `to_pil().convert("R
 prototype did. pypdfium2's raw buffer is BGR, so it is never used directly. Only the adapter flips to BGR (R18). Rejected:
 keeping RGB for byte parity (keeps a known bug). Details: [notes.md#d4](notes.md#d4-paddleocr-reads-arrays-as-bgr)
 
-### D5 · The output path comes from the resolved input name
+### D5 · The output path comes from the input's name
 
 For a folder, the output is `resolved.parent / (resolved.name + ".txt")`. For a file, it is
 `input.with_suffix(".txt")`. Paths are compared after `resolve()` (R6, R10). Rejected:
@@ -246,8 +250,8 @@ the output away from where prototype users expect it).
 
 1. Validate arguments and paths (R9, R10).
 2. List the pages.
-3. Pre-check every page: fully decode each image and read its size; read each PDF page's rendered
-   width (R5, R7, R8).
+3. Pre-check every page: decode each image fully; compute each PDF page's width as pypdfium2
+   renders it, `ceil(width × DPI / 72)` (R5, R7, R8). A later render failure is an R8 error.
 4. Load the engine and OCR every page.
 5. Write the text to a temp file `.<name>.<random>.tmp` in the output's directory, give it the old
    output's mode (or the umask default), and `os.replace` it onto the output.
@@ -262,7 +266,9 @@ skipping bad pages (owner's choice, 2026-11-16). Details: [notes.md#d6](notes.md
 prints argparse's two-line format. 1 means any other error, and 130 means Ctrl-C (R20). `run`
 catches argparse's `SystemExit` and returns its code. After parsing, it catches every `Exception`,
 collapses the message to one line of at most 300 characters, prints the R12 line and returns 1.
-With `SCANSCRIBE_DEBUG=1` it re-raises instead, for a full traceback. Rejected: listing the
+With `SCANSCRIBE_DEBUG=1` it re-raises instead, for a full traceback. `run` also catches
+`KeyboardInterrupt` around the whole run, from parsing to the write, prints
+`scanscribe: error: interrupted` and returns 130 (R20); `SCANSCRIBE_DEBUG` doesn't apply to it. Rejected: listing the
 exception types to catch (misses `OSError` and others).
 
 ### D8 · Empty inputs are errors
@@ -293,7 +299,7 @@ could slip in). Details: [notes.md#d9](notes.md#d9-fake-engine-and-fixtures)
 ## Risks
 
 - The OCR text differs from the prototype's. `uv.lock` pins the same Paddle versions as the
-  prototype and only pypdfium2 differs, so a diff mostly measures D4. Mitigation: the manual check
+  prototype and only pypdfium2 differs, so a diff on an image-folder input measures D4 alone. Mitigation: the manual check
   includes a color page. A page reads worse when a word the prototype got right is wrong. Phase 02
   then stays blocked until the owner reverses D4 through a plan update or accepts the result
   ([notes.md#manual-check](notes.md#manual-check)).
@@ -336,9 +342,13 @@ needs no change.
 
 | Phase | Title | Status | Tasks | Delivers |
 | --- | --- | --- | --- | --- |
-| 01 | [Page pipeline and CLI on a fake engine](phases/01-pipeline-and-cli.md) | approved | 0/12 | R1–R12, R20 |
+| 01 | [Page pipeline and CLI on a fake engine](phases/01-pipeline-and-cli.md) | done | 12/12 | R1–R12, R20 |
 | 02 | [PaddleOCR adapter and the scanscribe command](phases/02-paddleocr-adapter.md) | approved | 0/8 | R13–R19 |
 
 ## Decision log
 
-None yet. Changes made after approval are logged here.
+- 2026-11-16: R10 also rejects an output inside a folder input whose name R1 would list as a
+  page, so a typo in `-o` can't overwrite a source image (impl review F55).
+- 2026-11-16: design review round 3 stated what phase 01's code already does in R3, R10, D1, D5,
+  D6 and D7, and added phase 02 work for Paddle's stdout logging, adapter re-imports in tests and
+  running the tests on an extra (F62–F68, F70).
