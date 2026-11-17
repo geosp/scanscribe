@@ -128,3 +128,6 @@ Diff base 75c67e0, reviewed commit 6fabbf3. Reviewers: contract ✅ (the owner c
 | F92 | Nit | contract | The subprocess R13 test lists modules by hand (task 1.4) | accepted: matches every current module; revisit when one is added |
 | F93 | Nit | contract | The broken-install test mocks `import_module` rather than a real native failure (task 1.3) | accepted: it tests the `exc.name` filter, which is the rule |
 | F94 | Nit | contract | No test runs the installed console script (R19) | accepted: the manual check ran `.venv/bin/scanscribe` on both builds |
+
+## 2026-11-16 · ADR review
+ADRs in force reviewed: none existed. Created: ADR-0001, the OCR engine behind an interface, imported only when OCR starts (from D1, D2). The other decisions (D3–D9) are tactical or recorded in docs/decision-log.md, so they need no ADR.
