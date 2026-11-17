@@ -109,3 +109,6 @@ Reopened by the R10 change from impl review F55. Reviewers: fresh reader ✅ · 
 | F82 | Nit | zoom out | A PDF diff also measures the pypdfium2 upgrade; the colour page should come from an image folder (Risks) | fixed: Risks; notes Manual check (image-folder input) |
 | F83 | Nit | zoom out | On the base install, R14's message appears only after the whole pre-check decodes every image (R14) | accepted: the wait is the pre-check's decode time, seconds per few hundred pages |
 | F84 | Nit | zoom out | mypy is checked only on the base install; an extra's `py.typed` could change the result locally (phase 02 1.2) | fixed: phase 02 3.1 (with F64) |
+
+## 2026-11-16 · waiver · phase 01 · impl-review re-check
+The owner waived the fresh-reviewer re-check of the round 1 fixes (docs/reviews/README.md rule 6): "Is time to implement. Too many reviews." Every round 1 Major (F45, F46) was fixed test first with a mutation check; all three reviewers had completed. impl_review set to passed.
