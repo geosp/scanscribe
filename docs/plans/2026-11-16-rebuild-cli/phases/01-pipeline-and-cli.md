@@ -5,7 +5,7 @@ status: in-progress
 branch: feat/4-pipeline-and-cli
 base: 7594141b5dcc874b13cf03c8b7b80369fbb1b80a
 delivers: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R20]
-design_review: { status: passed, rounds: 2, last: 2026-11-16 }
+design_review: { status: changes-requested, rounds: 2, last: 2026-11-16 }
 impl_review: { status: changes-requested, rounds: 1, last: 2026-11-16 }
 approved: 2026-11-16
 ---
@@ -69,7 +69,8 @@ Paddle code and no console command; phase 02 adds both.
 ### 4. CLI (`src/scanscribe/cli.py`)
 
 - [x] 4.1 Build the argparse parser with the R19 options and defaults (`prog="scanscribe"`). Add
-  validators for `--columns` and `--dpi` below 1 (R9), and for the R10 path rules, each reported through `parser.error()`; writability is checked with
+  validators for `--columns` and `--dpi` below 1 (R9), and for the R10 path rules (including an
+  output that would be a page of a folder input), each reported through `parser.error()`; writability is checked with
   `os.access`. `run` catches
   argparse's `SystemExit` and returns its code (D7). Verify: a test for each rule asserts that
   `run` returns 2 and the engine factory is never called; another asserts the defaults (`en`, 200, 1, no device) and that `--help` lists every R19 option

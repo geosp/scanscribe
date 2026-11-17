@@ -3,7 +3,7 @@ title: Rebuild the scanscribe CLI from the ocr-pdf prototype
 status: in-progress
 created: 2026-11-16
 updated: 2026-11-16
-design_review: { status: passed, rounds: 2, last: 2026-11-16 }
+design_review: { status: changes-requested, rounds: 2, last: 2026-11-16 }
 approved: 2026-11-16
 adr_review: null
 ---
@@ -141,10 +141,11 @@ A `--columns` or `--dpi` value below 1 is a usage error.
 
 ### R10 · Bad input or output paths are usage errors
 
-A missing input, an output that is an existing directory, an output directory that is missing or not writable, or an output that resolves to the input is a usage error, raised before any page is read.
+A missing input, an output that is an existing directory, an output directory that is missing or not writable, an output that resolves to the input, or, for a folder input, an output inside that folder whose name R1 would list as a page is a usage error, raised before any page is read.
 - **Given** `-o missing-dir/out.txt`, or `-o out` where `out/` is a directory, **when** the command runs, **then** it exits 2 and no page is read.
 - **Given** an output directory without write permission, **when** the command runs, **then** it exits 2 and no page is read.
 - **Given** `-o book.pdf` for the input `book.pdf`, **when** the command runs, **then** it exits 2 and the PDF is untouched.
+- **Given** `-o book/p1.png` for the folder `book`, **when** the command runs, **then** it exits 2 and `p1.png` is untouched.
 
 ### R11 · Progress goes to stderr, never stdout
 
@@ -336,9 +337,10 @@ needs no change.
 
 | Phase | Title | Status | Tasks | Delivers |
 | --- | --- | --- | --- | --- |
-| 01 | [Page pipeline and CLI on a fake engine](phases/01-pipeline-and-cli.md) | in-progress | 0/12 | R1–R12, R20 |
+| 01 | [Page pipeline and CLI on a fake engine](phases/01-pipeline-and-cli.md) | in-progress | 12/12 | R1–R12, R20 |
 | 02 | [PaddleOCR adapter and the scanscribe command](phases/02-paddleocr-adapter.md) | approved | 0/8 | R13–R19 |
 
 ## Decision log
 
-None yet. Changes made after approval are logged here.
+- 2026-11-16: R10 also rejects an output inside a folder input whose name R1 would list as a
+  page, so a typo in `-o` can't overwrite a source image (impl review F55).
