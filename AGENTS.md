@@ -6,7 +6,7 @@ Shared instructions for every coding agent working in this repository. Claude Co
 
 **scanscribe** is a command-line tool that OCRs scanned PDFs and folders of page images (for example, phone or Kindle screenshots of a book) into page-marked plain text, using PaddleOCR. It runs on an NVIDIA GPU when one is available and falls back to the CPU otherwise. Its output feeds downstream study tools such as Skill Central's `study-book-chapter`.
 
-**Status:** repository setup is in progress. The first implementation plan, rebuilding the CLI, is next. The previous prototype lives outside this repository and is reference material only.
+**Status:** the `scanscribe` command is implemented (plan `docs/plans/2026-11-16-rebuild-cli/`). The previous prototype lives outside this repository and is reference material only.
 
 ## Read this first
 
