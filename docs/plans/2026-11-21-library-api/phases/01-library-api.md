@@ -21,10 +21,11 @@ every existing test passes unchanged, and the README documents the API.
 
 ### 1. The API
 
-- [ ] 1.1 In `pages.py`, store `columns` on `PageSource`, and make `open_source` raise
+- [x] 1.1 In `pages.py`, store `columns` on `PageSource`, and make `open_source` raise
   `UsageError` for `columns` or `dpi` below 1 and for a missing or uncheckable path (R5, R6, D4).
   Write the tests first in a new `tests/test_api.py`, using the fixture builders in
-  `tests/conftest.py`. Verify: R5 and R6 tests pass; `tests/test_pages.py` passes unchanged.
+  `tests/conftest.py`. Verify: R5 and R6 tests pass; `tests/test_pages.py` passes, with one test now creating
+  the file it passes to `open_source` (Decision log).
 - [x] 1.2 Add `src/scanscribe/api.py` with `ProgressCallback`, `ocr_source` and `transcribe`
   (R2, R3, R4, R7, D1). It imports only `engine`, `pages` and `output`. Tests use `FakeEngine`.
   Verify: R2, R3, R4, R7 tests pass; `uv run mypy` clean.

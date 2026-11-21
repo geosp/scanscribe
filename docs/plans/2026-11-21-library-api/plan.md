@@ -246,8 +246,10 @@ guide) reads the output file, which doesn't change.
 
 | Phase | Title | Status | Tasks |
 | --- | --- | --- | --- |
-| 01 | [Library API and CLI on top of it](phases/01-library-api.md) | in-progress | 7/9 |
+| 01 | [Library API and CLI on top of it](phases/01-library-api.md) | in-progress | 8/9 |
 
 ## Decision log
 
-<!-- One dated line per change made after approval. -->
+- 2026-11-21 · task 1.1 changed: `test_pdf_with_no_pages_is_an_input_error` mocks the PDF
+  opener with a path that doesn't exist, which D4's missing-input check now rejects first. The
+  test now creates the file; it still checks empty PDFs. Owner accepted.
