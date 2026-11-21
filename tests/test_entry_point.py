@@ -1,4 +1,4 @@
-"""The command and its import path never import Paddle (R13, R19)."""
+"""The import path never imports Paddle (R13, R19), and `__all__` is the public API."""
 
 from __future__ import annotations
 
@@ -9,18 +9,22 @@ from pathlib import Path
 
 import pytest
 
+import scanscribe
 from scanscribe import cli
 
 NO_PADDLE_SCRIPT = textwrap.dedent(
     """
     import sys
-    import scanscribe, scanscribe.cli, scanscribe.engine, scanscribe.output, scanscribe.pages
+    import scanscribe, scanscribe.api, scanscribe.cli, scanscribe.engine, scanscribe.output
+    import scanscribe.pages
+    from scanscribe import *
     from scanscribe.cli import run
     from scanscribe.engine import load_engine
 
     code = run(["--help"], load_engine)
+    unbound = [name for name in scanscribe.__all__ if name not in globals()]
     leaked = [m for m in ("paddle", "paddleocr", "scanscribe.paddle_engine") if m in sys.modules]
-    print("RESULT", code, leaked, file=sys.stderr)
+    print("RESULT", code, unbound, leaked, file=sys.stderr)
     """
 )
 
@@ -29,8 +33,33 @@ def test_import_path_and_help_never_import_paddle() -> None:
     done = subprocess.run(
         [sys.executable, "-c", NO_PADDLE_SCRIPT], capture_output=True, text=True, check=True
     )
-    assert "RESULT 0 []" in done.stderr
+    assert "RESULT 0 [] []" in done.stderr
     assert "usage: scanscribe" in done.stdout
+
+
+PUBLIC_API = [
+    "EngineFactory",
+    "EngineMissingError",
+    "IMAGE_EXTENSIONS",
+    "InputError",
+    "OcrEngine",
+    "PageImage",
+    "PageSource",
+    "ProgressCallback",
+    "ScanscribeError",
+    "UsageError",
+    "format_pages",
+    "load_engine",
+    "ocr_source",
+    "open_source",
+    "transcribe",
+]
+"""The public names in the library-api plan's D2. Changing this list changes the semver API."""
+
+
+def test_all_is_exactly_the_public_api() -> None:
+    assert sorted(scanscribe.__all__) == sorted(PUBLIC_API)
+    assert len(set(scanscribe.__all__)) == len(scanscribe.__all__)
 
 
 def test_main_exits_with_runs_code(monkeypatch: pytest.MonkeyPatch) -> None:
