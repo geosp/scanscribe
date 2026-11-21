@@ -111,6 +111,50 @@ Every page is checked before OCR starts, and the output file is replaced only af
 
 The first run downloads PaddleOCR's models, which takes a while. Two first runs started at the same time can collide on that download; let one finish first.
 
+## Use as a library
+
+scanscribe can also be called from Python, for example by an MCP server. Load the engine once and reuse it for every input:
+
+```python
+from pathlib import Path
+
+from scanscribe import UsageError, InputError, load_engine, transcribe
+
+engine = load_engine("en", None, on_device=lambda device: print("OCR on", device))
+
+
+def progress(page: int, total: int) -> None:
+    print(f"page {page}/{total}")  # raise any exception here to stop between pages
+
+
+try:
+    text = transcribe(Path("in/my-book.pdf"), engine, dpi=200, columns=1, on_page=progress)
+except (UsageError, InputError) as exc:
+    print("cannot OCR:", exc)
+```
+
+`transcribe` returns the same page-marked text the command writes, with the same defaults. It never prints or writes a file, although PaddleOCR itself logs to stderr. Bad arguments or a missing input raise `UsageError`, and an unreadable page raises `InputError`, both before any OCR. For more control, open the input with `open_source(path, dpi, columns)`, then call `ocr_source(source, engine, on_page)` to get each page's lines.
+
+The public API is exactly the names in `scanscribe.__all__`:
+
+- functions: `transcribe`, `ocr_source`, `open_source`, `format_pages` and `load_engine`;
+- types: `PageSource`, `OcrEngine`, `PageImage`, `EngineFactory` and `ProgressCallback`;
+- the constant `IMAGE_EXTENSIONS`;
+- errors: `ScanscribeError`, with its subclasses `UsageError`, `InputError` and `EngineMissingError`.
+
+It follows [semantic versioning](https://semver.org) from `v0.1.0`; everything else is internal. The package ships `py.typed`.
+
+Limits:
+
+- **One OCR job per process at a time.** While it runs, the PaddleOCR engine sends the whole process's stdout to stderr, and PDF rendering (pdfium) isn't safe from two threads.
+- **No progress during the pre-check.** Every page is checked before the first progress call, so a large folder of images takes a while before page 1.
+
+To depend on scanscribe from another uv project, pin a tag, then copy the PaddlePaddle settings from this repository's `pyproject.toml`: the two extras, the `[tool.uv] conflicts` rule, the `paddlepaddle-cu126` index and its `[tool.uv.sources]` entry. uv doesn't inherit those from a dependency.
+
+```toml
+dependencies = ["scanscribe @ git+https://github.com/geosp/scanscribe@v0.1.0"]
+```
+
 ## Book material
 
 Inputs and outputs are usually copyrighted books. `in/`, `out/`, PDFs and images are ignored by Git; keep them local.
