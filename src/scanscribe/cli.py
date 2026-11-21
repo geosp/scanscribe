@@ -8,9 +8,10 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from scanscribe.api import ocr_source
 from scanscribe.engine import EngineFactory, ScanscribeError, UsageError, load_engine
 from scanscribe.output import default_output_path, format_pages, write_atomic
-from scanscribe.pages import is_page_name, open_source, split_columns
+from scanscribe.pages import is_page_name, open_source
 
 
 def _at_least_one(value: str) -> int:
@@ -116,13 +117,9 @@ def convert(args: argparse.Namespace, output: Path, engine_factory: EngineFactor
     """
     with open_source(args.input, args.dpi, args.columns) as source:
         engine = engine_factory(args.lang, args.device)
-        pages: list[list[str]] = []
-        for number, image in enumerate(source.images(), 1):
-            _progress(f"Processing page {number}...")
-            lines: list[str] = []
-            for column in split_columns(image, args.columns):
-                lines.extend(engine.recognize(column))
-            pages.append(lines)
+        pages = ocr_source(
+            source, engine, on_page=lambda number, _total: _progress(f"Processing page {number}...")
+        )
     write_atomic(output, format_pages(pages))
     _progress(f"Extracted text written to {output}")
 

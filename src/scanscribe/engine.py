@@ -52,9 +52,17 @@ ENGINE_MISSING_MESSAGE = (
 _ENGINE_MODULES = frozenset({"paddle", "paddleocr"})
 
 
-def load_engine(lang: str, device: str | None) -> OcrEngine:
-    """Load the PaddleOCR engine, choose its device and print it (D2, R14, R15, R16).
+def _print_device(device: str) -> None:
+    print(f"Using device: {device}", file=sys.stderr, flush=True)
 
+
+def load_engine(
+    lang: str, device: str | None, *, on_device: Callable[[str], None] | None = None
+) -> OcrEngine:
+    """Load the PaddleOCR engine, choose its device and report it (D2, R14, R15, R16).
+
+    The device goes to `on_device` when given, else to stderr as `Using device: <device>`. It is
+    reported before the engine is built, so it shows during a first-run model download.
     Paddle is imported here and only here, so the CLI and the tests never import it otherwise.
     """
     try:
@@ -66,7 +74,6 @@ def load_engine(lang: str, device: str | None) -> OcrEngine:
             raise EngineMissingError(ENGINE_MISSING_MESSAGE) from exc
         raise
     resolved: str = adapter.resolve_device(device)
-    # Printed before the engine is built, so it shows during a first-run model download.
-    print(f"Using device: {resolved}", file=sys.stderr, flush=True)
+    (on_device or _print_device)(resolved)
     engine: OcrEngine = adapter.PaddleOcrEngine(lang, resolved)
     return engine
