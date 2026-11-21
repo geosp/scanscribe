@@ -57,6 +57,19 @@ def test_input_in_an_unreadable_directory_is_a_usage_error(locked_dir: Path) -> 
     assert "book.pdf" in str(caught.value)
 
 
+def test_a_folder_that_cannot_be_listed_is_a_usage_error(locked_dir: Path) -> None:
+    with pytest.raises(UsageError, match="cannot list") as caught:
+        open_source(locked_dir, dpi=200, columns=1)
+    assert str(locked_dir) in str(caught.value)
+
+
+def test_a_str_path_is_accepted(fx: Fixtures) -> None:
+    folder = fx.image_folder("book", {"p1.png": ["red"]})
+    assert transcribe(str(folder), FakeEngine()) == "--- Page 1 ---\nred"
+    with pytest.raises(UsageError, match="input not found"):
+        open_source(str(folder / "nope.pdf"), dpi=200, columns=1)
+
+
 def test_source_keeps_the_columns_it_was_opened_with(fx: Fixtures) -> None:
     folder = fx.image_folder("book", {"p1.png": ["red", "blue"]})
     with open_source(folder, dpi=200, columns=2) as source:
@@ -95,6 +108,23 @@ def test_progress_comes_before_each_page_is_recognized(fx: Fixtures) -> None:
         (3, 3),
         ("recognize", "blue"),
     ]
+
+
+def test_progress_comes_before_the_first_strip_of_each_pdf_page(fx: Fixtures) -> None:
+    pdf = fx.pdf("book.pdf", [["red", "blue"], ["green", "yellow"]], width=144)
+    engine = FakeEngine()
+    events: list[object] = []
+    original = engine.recognize
+
+    def recognize(image: PageImage) -> list[str]:
+        lines = original(image)
+        events.append(lines[0])
+        return lines
+
+    engine.recognize = recognize  # type: ignore[method-assign]
+    with open_source(pdf, dpi=144, columns=2) as source:
+        ocr_source(source, engine, on_page=lambda n, total: events.append((n, total)))
+    assert events == [(1, 2), "red", "blue", (2, 2), "green", "yellow"]
 
 
 def test_an_exception_from_on_page_stops_the_run_unchanged(fx: Fixtures) -> None:
@@ -155,7 +185,7 @@ def test_transcribe_rejects_a_missing_input_naming_it(tmp_path: Path) -> None:
 
 
 def test_transcribe_prints_nothing_and_writes_no_file(
-    fx: Fixtures, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    fx: Fixtures, tmp_path: Path, capfd: pytest.CaptureFixture[str]
 ) -> None:
     folder = fx.image_folder("book", {"p1.png": ["red"], "p2.png": ["blue"]})
     pdf = fx.pdf("book.pdf", [["green"]])
@@ -163,7 +193,7 @@ def test_transcribe_prints_nothing_and_writes_no_file(
     assert transcribe(folder, FakeEngine()) == "--- Page 1 ---\nred\n\n--- Page 2 ---\nblue"
     assert transcribe(pdf, FakeEngine()) == "--- Page 1 ---\ngreen"
     assert sorted(tmp_path.rglob("*")) == before
-    captured = capsys.readouterr()
+    captured = capfd.readouterr()
     assert captured.out == ""
     assert captured.err == ""
 

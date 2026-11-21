@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import os
 import re
 from collections.abc import Iterator
 from itertools import pairwise
@@ -95,7 +96,10 @@ class ImageFolderSource(PageSource):
     def __init__(self, folder: Path, columns: int) -> None:
         self.path = folder
         self.columns = columns
-        self.files = list_image_files(folder)
+        try:
+            self.files = list_image_files(folder)
+        except OSError as exc:
+            raise UsageError(f"cannot list {folder}: {exc}") from exc
         if not self.files:
             raise InputError(f"no page images found in {folder}")
         self.labels = [path.name for path in self.files]
@@ -202,12 +206,13 @@ def _input_is_dir(path: Path) -> bool:
         raise UsageError(f"cannot check path: {exc}") from exc
 
 
-def open_source(path: Path, dpi: int, columns: int) -> PageSource:
+def open_source(path: str | os.PathLike[str], dpi: int, columns: int) -> PageSource:
     """Open and pre-check an input: a folder of images, or any file as a PDF (R2).
 
-    Raises `UsageError` for `dpi` or `columns` below 1 and for a missing or uncheckable path,
-    before any page is read; `InputError` for a page that fails the pre-check.
+    Raises `UsageError` for `dpi` or `columns` below 1 and for a missing, uncheckable or
+    unlistable path, before any page is read; `InputError` for a page that fails the pre-check.
     """
+    path = Path(path)
     _check_at_least_one("dpi", dpi)
     _check_at_least_one("columns", columns)
     if _input_is_dir(path):

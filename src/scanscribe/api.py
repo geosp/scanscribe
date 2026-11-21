@@ -6,8 +6,8 @@ protocol. The engine may still log: PaddleOCR logs to stderr.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
-from pathlib import Path
 
 from scanscribe.engine import OcrEngine
 from scanscribe.output import format_pages
@@ -39,7 +39,7 @@ def ocr_source(
 
 
 def transcribe(
-    path: Path,
+    path: str | os.PathLike[str],
     engine: OcrEngine,
     *,
     dpi: int = 200,
