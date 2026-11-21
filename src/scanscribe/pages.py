@@ -13,7 +13,7 @@ import numpy as np
 import pypdfium2 as pdfium
 from PIL import Image
 
-from scanscribe.engine import InputError, PageImage
+from scanscribe.engine import InputError, PageImage, UsageError
 
 IMAGE_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"})
 
@@ -58,6 +58,8 @@ class PageSource:
     """
 
     path: Path
+    columns: int
+    """How many strips each page is cut into; every page was checked to be at least this wide."""
     labels: list[str]
     """Each page's name for messages: the file name, or `page N` in a PDF."""
 
@@ -92,6 +94,7 @@ class ImageFolderSource(PageSource):
 
     def __init__(self, folder: Path, columns: int) -> None:
         self.path = folder
+        self.columns = columns
         self.files = list_image_files(folder)
         if not self.files:
             raise InputError(f"no page images found in {folder}")
@@ -128,6 +131,7 @@ class PdfSource(PageSource):
 
     def __init__(self, path: Path, dpi: int, columns: int) -> None:
         self.path = path
+        self.columns = columns
         self.scale = dpi / 72
         try:
             self.document = _open_pdf(path)
@@ -179,9 +183,34 @@ class PdfSource(PageSource):
             self.document = None
 
 
+def _check_at_least_one(name: str, value: int) -> None:
+    if value < 1:
+        raise UsageError(f"{name} must be at least 1, got {value}")
+
+
+def _input_is_dir(path: Path) -> bool:
+    """Whether the input is a folder; a missing or uncheckable path is a usage error.
+
+    `OSError` and `RuntimeError` (a symlink loop) become `UsageError`, as in
+    `cli.resolve_output`.
+    """
+    try:
+        if not path.exists():
+            raise UsageError(f"input not found: {path}")
+        return path.is_dir()
+    except (OSError, RuntimeError) as exc:
+        raise UsageError(f"cannot check path: {exc}") from exc
+
+
 def open_source(path: Path, dpi: int, columns: int) -> PageSource:
-    """Open and pre-check an input: a folder of images, or any file as a PDF (R2)."""
-    if path.is_dir():
+    """Open and pre-check an input: a folder of images, or any file as a PDF (R2).
+
+    Raises `UsageError` for `dpi` or `columns` below 1 and for a missing or uncheckable path,
+    before any page is read; `InputError` for a page that fails the pre-check.
+    """
+    _check_at_least_one("dpi", dpi)
+    _check_at_least_one("columns", columns)
+    if _input_is_dir(path):
         return ImageFolderSource(path, columns)
     return PdfSource(path, dpi, columns)
 

@@ -146,6 +146,7 @@ def test_pdf_with_no_pages_is_an_input_error(
 
     monkeypatch.setattr(pages, "_open_pdf", lambda path: EmptyDocument())
     path = tmp_path / "empty.pdf"
+    path.touch()  # open_source rejects a missing path before it opens the PDF (library-api D4)
     with pytest.raises(InputError, match="has no pages") as caught:
         open_source(path, dpi=200, columns=1)
     assert str(path) in str(caught.value)
