@@ -8,10 +8,11 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from conftest import FakeEngine, FakePaddle, Fixtures
+from conftest import FakeEngine, FakeFactory, FakePaddle, Fixtures
 
 from scanscribe import pages
 from scanscribe.api import ocr_source, transcribe
+from scanscribe.cli import run
 from scanscribe.engine import PageImage, UsageError, load_engine
 from scanscribe.pages import open_source
 
@@ -192,3 +193,33 @@ def test_without_on_device_the_device_is_printed_to_stderr(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err.splitlines() == ["Using device: gpu:0"]
+
+
+# --- transcribe matches the CLI (R1) -------------------------------------------------------
+
+
+def cli_output(argv: list[str], output: Path) -> str:
+    assert run([*argv, "-o", str(output)], FakeFactory()) == 0
+    return output.read_text(encoding="utf-8")
+
+
+def test_transcribe_on_a_folder_matches_the_cli(fx: Fixtures, tmp_path: Path) -> None:
+    folder = fx.image_folder("book", {"p10.png": ["blue"], "p2.jpg": ["green"], "p1.png": ["red"]})
+    expected = cli_output([str(folder)], tmp_path / "cli.txt")
+    assert transcribe(folder, FakeEngine()) == expected
+
+
+def test_transcribe_on_a_two_column_pdf_matches_the_cli(fx: Fixtures, tmp_path: Path) -> None:
+    pdf = fx.pdf("book.pdf", [["red", "blue"], ["green", "yellow"]], width=144)
+    expected = cli_output([str(pdf), "--columns", "2", "--dpi", "144"], tmp_path / "cli.txt")
+    assert expected == "--- Page 1 ---\nred\nblue\n\n--- Page 2 ---\ngreen\nyellow"
+    assert transcribe(pdf, FakeEngine(), dpi=144, columns=2) == expected
+
+
+def test_transcribe_defaults_render_pdfs_like_the_cli(fx: Fixtures, tmp_path: Path) -> None:
+    pdf = fx.red_pdf()
+    factory = FakeFactory()
+    assert run([str(pdf), "-o", str(tmp_path / "cli.txt")], factory) == 0
+    engine = FakeEngine()
+    assert transcribe(pdf, engine) == (tmp_path / "cli.txt").read_text(encoding="utf-8")
+    assert engine.shapes == factory.engine.shapes == [(200, 200, 3)]
