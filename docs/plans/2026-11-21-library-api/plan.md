@@ -246,7 +246,7 @@ guide) reads the output file, which doesn't change.
 
 | Phase | Title | Status | Tasks |
 | --- | --- | --- | --- |
-| 01 | [Library API and CLI on top of it](phases/01-library-api.md) | in-progress | 0/9 |
+| 01 | [Library API and CLI on top of it](phases/01-library-api.md) | in-progress | 7/9 |
 
 ## Decision log
 
