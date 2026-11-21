@@ -1,6 +1,6 @@
 [project]
 name = "scanscribe"
-version = "0.1.0"
+version = "0.2.0"
 description = "OCR scanned PDFs and folders of page images into page-marked text, on the GPU when available."
 readme = "README.md"
 authors = [

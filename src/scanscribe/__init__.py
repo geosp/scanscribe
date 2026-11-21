@@ -18,7 +18,7 @@ from scanscribe.engine import (
 from scanscribe.output import format_pages
 from scanscribe.pages import IMAGE_EXTENSIONS, PageSource, open_source
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "IMAGE_EXTENSIONS",
