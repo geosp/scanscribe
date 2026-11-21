@@ -1,11 +1,11 @@
 ---
 title: A public library API for scanscribe
-status: implemented
+status: closed
 created: 2026-11-21
 updated: 2026-11-21
 design_review: { status: passed, rounds: 1, last: 2026-11-21 }
 approved: 2026-11-21
-adr_review: null
+adr_review: 2026-11-21
 ---
 
 # A public library API for scanscribe
@@ -253,3 +253,6 @@ guide) reads the output file, which doesn't change.
 - 2026-11-21 · task 1.1 changed: `test_pdf_with_no_pages_is_an_input_error` mocks the PDF
   opener with a path that doesn't exist, which D4's missing-input check now rejects first. The
   test now creates the file; it still checks empty PDFs. Owner accepted.
+- 2026-11-21 · at plan close the task 3.3 check also covers engine reuse and a run stopped from
+  `on_page`; all passed on gpu:0. Owner requested. Results:
+  [docs/demos/2026-11-21-library-check/README.md](../../demos/2026-11-21-library-check/README.md).
