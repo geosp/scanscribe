@@ -152,7 +152,7 @@ Limits:
 To depend on scanscribe from another uv project, pin a tag, then copy the PaddlePaddle settings from this repository's `pyproject.toml`: the two extras, the `[tool.uv] conflicts` rule, the `paddlepaddle-cu126` index and its `[tool.uv.sources]` entry. uv doesn't inherit those from a dependency.
 
 ```toml
-dependencies = ["scanscribe @ git+https://github.com/geosp/scanscribe@v0.1.0"]
+dependencies = ["scanscribe @ git+https://github.com/geosp/scanscribe@v0.2.0"]
 ```
 
 ## Book material

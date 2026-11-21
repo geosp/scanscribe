@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import textwrap
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -89,3 +90,9 @@ def test_session_check_fails_a_run_that_imported_paddle(
     result = pytester.runpytest_subprocess()
     assert result.ret == expected
     assert ("R13: the test run imported the real paddle" in result.stdout.str()) is leak
+
+
+def test_version_matches_pyproject() -> None:
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    with pyproject.open("rb") as file:
+        assert scanscribe.__version__ == tomllib.load(file)["project"]["version"]
