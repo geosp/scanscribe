@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Geovanny Fajardo", email = "20133884+geosp@users.noreply.github.com" },
 ]
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.11,<3.13"
 dependencies = [
     "numpy>=1.26",
     "pillow>=10.0",
@@ -54,13 +54,13 @@ paddlepaddle-gpu = { index = "paddlepaddle-cu126" }
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 strict = true
 packages = ["scanscribe"]
 mypy_path = "src"
