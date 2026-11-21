@@ -32,3 +32,23 @@ Reviewers: fresh reader ✅ · codebase fit ✅ · zoom out ✅ (commit 6ff8597;
 All fixes applied after the round; no Blocker or Major is open, so design_review is passed. The owner chose a single round, so no re-check round ran.
 
 ## 2026-11-21 · approved · plan (phase 01)
+
+## 2026-11-21 · impl-review · phase 01 · round 1 · changes-requested
+Diff base 49ecda0, reviewed commit 4c190ed. Reviewers: contract ✅ (the owner chose one reviewer, the contract lens; report in docs/reviews/2026-11-21-library-api/raw/impl-review-phase-01-round-01-contract.md).
+
+| ID | Sev | Lens | Finding | Resolution |
+| --- | --- | --- | --- | --- |
+| F24 | Major | contract | A folder input that exists but can't be listed (mode 0o000) escapes `open_source` as a raw `PermissionError` from `iterdir()`, not `UsageError`; the R6 test only covers a path inside a locked folder (R6, D4) | fixed: `test_a_folder_that_cannot_be_listed_is_a_usage_error`; `ImageFolderSource` wraps the listing (3c2e2a1) |
+| F25 | Nit | contract | The R2 test uses `capsys`, which can't see output written straight to file descriptors; `capfd` would (R2) | fixed: `test_transcribe_prints_nothing_and_writes_no_file` uses `capfd` (3c2e2a1) |
+| F26 | Nit | contract | The R3 order test covers only a one-column folder, not a PDF or `columns=2` (R3) | fixed: `test_progress_comes_before_the_first_strip_of_each_pdf_page` (3c2e2a1) |
+| F27 | Nit | contract | The no-Paddle script imports `load_engine` and `run` before its `unbound` check, which adds little over the star import (R9) | accepted: the star import already fails on an unbound name; the explicit imports are what the CLI uses |
+| F28 | Nit | contract | The `__all__` pin runs in-process, not in the fresh interpreter the scenario names (R9) | accepted: `__all__` is a literal, so in-process and fresh-interpreter values are the same |
+| F29 | Nit | contract | No automated check that the wheel holds `py.typed`, and the by-hand result isn't recorded (R10) | accepted: the plan's Assumptions make it a by-hand check; the result goes in the PR |
+| F30 | Nit | contract | "input not found" / "cannot check path" and "must be at least 1" are written in both `pages.py` and `cli.py`; the two copies can drift (D4, task 1.1) | accepted: D4 keeps the CLI's checks so its messages and exit codes don't change; the messages are each one short line |
+| F31 | Nit | contract | The `locked_dir` fixture is copied from test_cli.py into test_api.py (task 1.1) | accepted: moving it to conftest.py would edit test_cli.py, which the plan keeps unchanged |
+| F32 | Nit | contract | An input removed between the CLI's path check and `open_source` now gives a `UsageError` with exit 1, while `UsageError` is documented as exit 2 (D4) | accepted: only a race between two stat calls; the exit code, 1, is unchanged from before |
+| F33 | Nit | contract | `transcribe("book.pdf", …)` with a `str` raises `AttributeError`, not `UsageError`; mypy catches it for typed callers (R6) | fixed: `test_a_str_path_is_accepted`; `open_source` and `transcribe` take `str | os.PathLike[str]` (3c2e2a1) |
+| F34 | Nit | contract | A third-party `PageSource` subclass that doesn't set `columns` fails inside `ocr_source` (R7, D2) | accepted: `labels` already works this way; `PageSource` is exported to type sources, not to subclass |
+| F35 | Nit | contract | The decision-log line gives the plan path in backticks, not a Markdown link (task 3.2) | accepted: every row in docs/decision-log.md cites plans by path in backticks |
+
+The Major was fixed test first; no Blocker or Major is open, so impl_review is passed. The owner chose a single round.
