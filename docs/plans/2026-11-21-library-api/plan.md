@@ -253,3 +253,8 @@ guide) reads the output file, which doesn't change.
 - 2026-11-21 · task 1.1 changed: `test_pdf_with_no_pages_is_an_input_error` mocks the PDF
   opener with a path that doesn't exist, which D4's missing-input check now rejects first. The
   test now creates the file; it still checks empty PDFs. Owner accepted.
+- 2026-11-21 · at plan close, task 3.3's check was extended: with one loaded engine it also runs
+  `transcribe` a second time, stops a run by raising from `on_page` at page 5, and runs once more.
+  All passed on the GPU (gpu:0), with results in
+  [docs/demos/2026-11-21-library-check/README.md](../../demos/2026-11-21-library-check/README.md).
+  Owner requested.
