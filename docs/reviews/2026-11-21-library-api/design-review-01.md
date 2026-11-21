@@ -25,7 +25,7 @@ Reviewers received only:
 - codebase fit: the plan, `phases/01-library-api.md`, ADR-0001, `AGENTS.md` and the repository;
 - zoom out: the plan, `phases/01-library-api.md`, ADR-0001 and the repository.
 
-There is no `notes.md`. Revision: `6ff8597`. Before the round, the suite passed from a clean checkout (150 passed, mypy clean) on Python 3.11, because Python 3.12 is not installed on this machine.
+There is no `notes.md`. Revision: `6ff8597`. Before the round, the suite passed from a clean checkout with `uv sync --locked` (150 passed, mypy clean) on uv-managed Python 3.12.15.
 
 ## Fresh reader paraphrase
 
