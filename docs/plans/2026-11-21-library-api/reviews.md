@@ -52,3 +52,6 @@ Diff base 49ecda0, reviewed commit 4c190ed. Reviewers: contract ✅ (the owner c
 | F35 | Nit | contract | The decision-log line gives the plan path in backticks, not a Markdown link (task 3.2) | accepted: every row in docs/decision-log.md cites plans by path in backticks |
 
 The Major was fixed test first; no Blocker or Major is open, so impl_review is passed. The owner chose a single round.
+
+## 2026-11-21 · ADR review
+ADRs in force reviewed: [ADR-0001](../../adrs/0001-ocr-engine-behind-an-interface.md) (kept; this plan follows it). Created, with the owner's confirmation: [ADR-0002](../../adrs/0002-public-library-api.md) from D2 and [ADR-0003](../../adrs/0003-mcp-server-in-a-separate-repository.md) from D3. D1 and D4 are API-shape details covered by ADR-0002, so they need no ADR.

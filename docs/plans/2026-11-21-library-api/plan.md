@@ -1,11 +1,11 @@
 ---
 title: A public library API for scanscribe
-status: implemented
+status: closed
 created: 2026-11-21
 updated: 2026-11-21
 design_review: { status: passed, rounds: 1, last: 2026-11-21 }
 approved: 2026-11-21
-adr_review: null
+adr_review: 2026-11-21
 ---
 
 # A public library API for scanscribe
