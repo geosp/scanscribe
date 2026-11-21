@@ -8,11 +8,11 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from conftest import FakeEngine, Fixtures
+from conftest import FakeEngine, FakePaddle, Fixtures
 
 from scanscribe import pages
 from scanscribe.api import ocr_source, transcribe
-from scanscribe.engine import PageImage, UsageError
+from scanscribe.engine import PageImage, UsageError, load_engine
 from scanscribe.pages import open_source
 
 # --- Argument and path checks in open_source (R5, R6, D4) ----------------------------------
@@ -165,3 +165,30 @@ def test_transcribe_prints_nothing_and_writes_no_file(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == ""
+
+
+# --- load_engine's device callback (R8) ----------------------------------------------------
+
+
+def test_on_device_gets_the_device_before_the_engine_is_built(
+    fake_paddle: FakePaddle, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake_paddle.gpus = 0
+    seen: list[tuple[str, int]] = []
+    load_engine(
+        "en", None, on_device=lambda device: seen.append((device, len(fake_paddle.created)))
+    )
+    assert seen == [("cpu", 0)]
+    assert len(fake_paddle.created) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+
+
+def test_without_on_device_the_device_is_printed_to_stderr(
+    fake_paddle: FakePaddle, capsys: pytest.CaptureFixture[str]
+) -> None:
+    load_engine("en", None)
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.splitlines() == ["Using device: gpu:0"]
