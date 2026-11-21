@@ -30,3 +30,5 @@ Reviewers: fresh reader ✅ · codebase fit ✅ · zoom out ✅ (commit 6ff8597;
 | F23 | Nit | fresh reader | R2 and R5 scenarios don't cover `ocr_source` or `dpi`; later version tagging unstated (R2, R5, Rollout) | fixed: R5 `dpi` scenario, Rollout tagging; accepted: R2's scenario runs `ocr_source` through `transcribe` |
 
 All fixes applied after the round; no Blocker or Major is open, so design_review is passed. The owner chose a single round, so no re-check round ran.
+
+## 2026-11-21 · approved · plan (phase 01)

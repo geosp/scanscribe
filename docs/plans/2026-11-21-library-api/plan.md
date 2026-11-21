@@ -1,10 +1,10 @@
 ---
 title: A public library API for scanscribe
-status: draft
+status: approved
 created: 2026-11-21
 updated: 2026-11-21
 design_review: { status: passed, rounds: 1, last: 2026-11-21 }
-approved: null
+approved: 2026-11-21
 adr_review: null
 ---
 
@@ -246,7 +246,7 @@ guide) reads the output file, which doesn't change.
 
 | Phase | Title | Status | Tasks |
 | --- | --- | --- | --- |
-| 01 | [Library API and CLI on top of it](phases/01-library-api.md) | draft | 0/9 |
+| 01 | [Library API and CLI on top of it](phases/01-library-api.md) | approved | 0/9 |
 
 ## Decision log
 
