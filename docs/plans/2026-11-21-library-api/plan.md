@@ -3,7 +3,7 @@ title: A public library API for scanscribe
 status: draft
 created: 2026-11-21
 updated: 2026-11-21
-design_review: { status: none, rounds: 0, last: null }
+design_review: { status: passed, rounds: 1, last: 2026-11-21 }
 approved: null
 adr_review: null
 ---
@@ -12,175 +12,215 @@ adr_review: null
 
 ## Summary
 
-scanscribe can be driven only as a command today. A separate MCP server, `scanscribe-mcp`, will
-need to call it as a library: keep one engine loaded across jobs, get the text back, show
-per-page progress and stop a job between pages. This plan adds a small public API: `transcribe`,
-`ocr_source`, an `on_device` hook on `load_engine`, `__all__` and a `py.typed` marker. The CLI
-moves onto the same API, so both paths run the same loop. The CLI's behavior doesn't change
-(the rebuild-cli plan's twenty requirements), and its tests stay as they are. After the merge the owner tags
-`v0.1.0` for the MCP repo to pin.
+scanscribe works only as a command today. A planned MCP server, `scanscribe-mcp`, in its own
+repository, needs to call it as a library. It must keep one engine loaded across jobs, get the
+text back, show per-page progress and stop a job between pages. This plan adds a small public API,
+listed exactly in D2:
+- `transcribe` and `ocr_source`, with a progress callback;
+- argument checks in `open_source`;
+- an `on_device` hook on `load_engine`;
+- a `py.typed` marker.
+
+Importing it must still never import Paddle (R9). The CLI's page loop moves onto `ocr_source`.
+Its output, messages and exit codes stay as they are, and its tests stay unchanged. The README
+documents the API and its semver promise. After the merge the owner tags `v0.1.0`.
 
 ```text
-scanscribe CLI ─┐
-                ├─> transcribe / ocr_source ─> open_source ─> engine.recognize ─> format_pages
-scanscribe-mcp ─┘          (on_page progress, stop by raising)
+CLI:    open_source ──> load_engine ──> ocr_source ──> format_pages ──> write file
+server: load_engine once;  per job: transcribe = open_source ─> ocr_source ─> format_pages
 ```
 
-The main risk is that the refactor changes CLI behavior. The existing CLI tests are the guard.
+Main risk: the refactor changes CLI behavior. The unchanged CLI tests and R1 guard against it.
 
 ## Why
 
-The owner chose to expose scanscribe over MCP with
-[mcp-service-kit](https://github.com/geosp/mcp-service-kit), in a separate repository that follows
-[pandoc-mcp](https://github.com/geosp/pandoc-mcp) (D3). `cli.convert()` takes an argparse
-`Namespace`, prints progress to stderr and writes the output file itself, so a server can't
-reuse it. A server runs OCR as background jobs. It needs the text, progress per page and a way to
-cancel. It loads the engine once, because loading PaddleOCR takes seconds to minutes. Without a
-supported API, the MCP repo would import private functions that may change.
+The owner chose to expose scanscribe over MCP from a separate repository (D3). `cli.convert()`
+takes an argparse `Namespace`, prints progress to stderr and writes the output file itself, so a
+server can't reuse it. A server runs OCR as background jobs. It needs the text back, progress per
+page and a way to cancel. It loads the engine once, because loading PaddleOCR takes seconds to
+minutes. Without a supported API, the MCP repo would import private functions that may change.
 
 ## What changes
 
-- New public functions `transcribe` and `ocr_source`, re-exported from `scanscribe` (R1–R5, D1).
-- `load_engine` gets an optional `on_device` callback (R6).
-- `scanscribe.__all__` lists the public names. `src/scanscribe/py.typed` ships in the wheel (R7,
-  R8, D2).
-- `cli.convert()` runs its loop through `ocr_source`. The output and messages are unchanged.
-- README gets a "Use as a library" section. The decision log records the public API and the
+- New public functions `transcribe` and `ocr_source` (R1–R4, R7, D1).
+- `open_source` rejects bad arguments and a missing input with `UsageError` (R5, R6, D4).
+- `PageSource` keeps the `columns` it was opened with, and `ocr_source` uses it (R7).
+- `load_engine` gets an optional `on_device` callback (R8).
+- `scanscribe.__all__` lists the public names. `py.typed` ships in the wheel (R9, R10, D2).
+- `cli.convert()` runs its loop through `ocr_source` and prints its progress line from `on_page`.
+- README gets a "Use as a library" section. `docs/decision-log.md` records the public API and the
   separate MCP repo (D3).
 
 ### Non-goals
 
 - Any MCP code: tools, jobs, uploads, HTTP, Docker. These belong to the `scanscribe-mcp` plan.
 - New OCR behavior, options or output format.
-- A test helper package (a fake engine) for other projects. The `OcrEngine` protocol has one
-  method, so a dependent project writes its own fake.
-- Thread safety. The API makes no promise about calling one engine from two threads; the server
-  will run one job at a time per engine.
+- A shared fake engine for other projects. `OcrEngine` has one method, so they write their own.
+- Concurrency. One process runs one OCR job at a time (Assumptions).
 
 ## Terms
 
-- **Public API**: the names in `scanscribe.__all__`. Changes to them follow semantic versioning
-  from `v0.1.0`; every other module attribute is internal.
-- **Engine**: an object with `recognize(image) -> list[str]`, the `OcrEngine` protocol in
-  `engine.py`. `load_engine(lang, device)` builds the PaddleOCR one.
-- **Page source**: an opened, pre-checked input (`PageSource`) from `open_source`. Opening it
-  checks every page before any OCR (the rebuild-cli plan's check-first rule).
-- **Progress callback**: a function `on_page(page_number, total_pages)` called before each page.
+- **The owner**: the repository owner, who approves plans, merges and pushes tags.
+- **Public API**: the names in `scanscribe.__all__` (D2). Changes to them follow semantic
+  versioning from `v0.1.0`; every other module attribute is internal.
+- **Engine**: an object with `recognize(image) -> list[str]` (the `OcrEngine` protocol).
+  `load_engine(lang, device)` builds the PaddleOCR one. Tests use `FakeEngine` from
+  `tests/conftest.py`, which names each slice's color instead of reading text.
+- **Page source**: an opened input (`PageSource`) from `open_source(path, dpi, columns)`.
+  Opening checks every page is readable and at least `columns` px wide; a failure raises
+  `InputError`. This is the **check-first rule** from the rebuild-cli plan: bad input fails
+  before the engine loads.
+- **`columns`**: how many equal-width strips each page is cut into, read left to right; each
+  strip is one `recognize` call. **`dpi`**: the resolution PDF pages are rendered at; images
+  ignore it.
+- **Page-marked text**: the output format, built by `format_pages`: `--- Page N ---` then the
+  page's lines, pages separated by a blank line.
+- **Progress callback**: `on_page(page_number, total_pages)`, called once per page.
 - **The rebuild-cli plan**: [docs/plans/2026-11-16-rebuild-cli](../2026-11-16-rebuild-cli/plan.md),
-  which defines the CLI's requirements and decisions. Its check-first rule: every page and path is checked before the engine loads, and the output is replaced only at the end.
-- **scanscribe-mcp**: the planned MCP server repository that will depend on this API.
+  which defines the CLI's current behavior.
+- **scanscribe-mcp**: the planned MCP server repository, built on mcp-service-kit (a small library
+  for FastMCP servers with stdio and HTTP transports) in the layout of pandoc-mcp (the owner's MCP
+  server for Pandoc conversions).
+- **Paddle install settings**: the custom package index for `paddlepaddle-gpu` and the uv
+  `conflicts` rule that keeps the `gpu` and `cpu` extras apart, in `pyproject.toml`.
 
 ## Requirements
 
 ### R1 · `transcribe` returns the same text the CLI writes
 
-`transcribe(path, engine, dpi=…, columns=…)` must return exactly the text the CLI would write for
+`transcribe(path, engine, dpi=200, columns=1)` must return exactly the text the CLI writes for
 the same input and options.
-- **Given** a folder of three pages, **when** `transcribe` runs with the fake engine, **then** its
-  result equals the file `scanscribe` writes for that folder.
-- **Given** a two-page PDF and `columns=2`, **when** `transcribe` runs, **then** its result equals
-  the CLI's output with `--columns 2`.
+- **Given** a folder of three pages, **when** `transcribe` runs with `FakeEngine`, **then** its result equals the file `scanscribe` writes for that folder.
+- **Given** a two-page PDF and `columns=2`, **when** `transcribe` runs, **then** its result equals the CLI's output with `--columns 2`.
 
-### R2 · The library never writes files or stdout
+### R2 · scanscribe's own code never writes files or stdout
 
-`transcribe` and `ocr_source` must never create files or write to stdout or stderr.
-- **Given** a folder input in `tmp_path`, **when** `transcribe` runs, **then** stdout and stderr
-  are empty and `tmp_path` holds the same files as before.
+`transcribe`, `ocr_source` and `open_source` must never create files or print. An engine may log;
+Paddle logs to stderr.
+- **Given** a folder input in `tmp_path` and `FakeEngine`, **when** `transcribe` runs, **then** stdout and stderr are empty and `tmp_path` holds the same files as before.
 
-### R3 · Progress is reported before each page
+### R3 · Progress is reported for each page before it is recognized
 
-`ocr_source` must call `on_page(n, total)` once per page, in order, before that page is
-recognized.
-- **Given** a three-page source, **when** `ocr_source` runs, **then** `on_page` receives `(1, 3)`,
-  `(2, 3)`, `(3, 3)`, and each call comes before that page's first `recognize` call.
+`ocr_source` must call `on_page(n, total)` once per page, in order, after the page is read and
+before its first `recognize` call.
+- **Given** a three-page source, **when** `ocr_source` runs, **then** `on_page` receives `(1, 3)`, `(2, 3)`, `(3, 3)`, each before that page's first `recognize` call.
 
 ### R4 · An exception from the progress callback stops the run
 
-If `on_page` raises, `ocr_source` must stop and let the exception propagate unchanged.
-- **Given** `on_page` raises on page 2, **when** `ocr_source` runs, **then** page 2 is never
-  recognized and the caller gets the same exception object.
+If `on_page` raises, the run must stop and the exception must reach the caller unchanged.
+- **Given** `on_page` raises on page 2, **when** `ocr_source` runs, **then** page 2 is never recognized and the caller gets the same exception object.
+- **Given** `on_page` raises during `transcribe` on a PDF, **when** the exception reaches the caller, **then** the source has been closed.
 
-### R5 · Invalid arguments are usage errors
+### R5 · `columns` or `dpi` below 1 is a usage error
 
-`transcribe` and `ocr_source` must raise `UsageError` when `columns` or `dpi` is below 1, or when
-the input path doesn't exist. They raise it before any page is read.
-- **Given** `columns=0`, **when** `transcribe` runs, **then** it raises `UsageError` and the
-  engine is never called.
-- **Given** a path that doesn't exist, **when** `transcribe` runs, **then** it raises `UsageError`
-  naming the path.
+`open_source` must raise `UsageError` when `columns` or `dpi` is below 1, before any page is read.
+- **Given** `columns=0`, **when** `transcribe` runs, **then** it raises `UsageError` and the engine is never called.
+- **Given** `dpi=0` and a PDF, **when** `open_source` runs, **then** it raises `UsageError`.
 
-### R6 · `load_engine` can report the device to a callback
+### R6 · A missing or uncheckable input is a usage error
+
+`open_source` must raise `UsageError` naming the path when the input doesn't exist or can't be
+checked, never a traceback.
+- **Given** a path that doesn't exist, **when** `transcribe` runs, **then** it raises `UsageError` naming the path.
+- **Given** an input inside a directory with no read permission, **when** `open_source` runs, **then** it raises `UsageError`.
+
+### R7 · Pages are split with the `columns` the source was opened with
+
+`ocr_source` must split pages with the source's own `columns`, so the width check always matches
+the split.
+- **Given** a source opened with `columns=2`, **when** `ocr_source` runs, **then** each page gives two `recognize` calls, left strip first.
+
+### R8 · `load_engine` reports the device to a callback before it builds the engine
 
 When `on_device` is given, `load_engine` must pass the resolved device to it instead of printing
-`Using device: …`.
-- **Given** fake Paddle modules with no GPU, **when** `load_engine("en", None, on_device=cb)` runs, **then** `cb` receives `"cpu"` and nothing is printed.
-- **Given** no `on_device`, **when** `load_engine` runs, **then** `Using device: <device>` is
-  printed to stderr, as today.
+`Using device: …`, before it builds the engine.
+- **Given** the `fake_paddle` fixture with no GPU, **when** `load_engine("en", None, on_device=cb)` runs, **then** `cb` receives `"cpu"` before the fake PaddleOCR is constructed and nothing is printed.
+- **Given** no `on_device`, **when** `load_engine` runs, **then** `Using device: <device>` is printed to stderr, as today.
 
-### R7 · `__all__` names the public API and importing it never imports Paddle
+### R9 · The public names are exactly D2's list, and importing them never imports Paddle
 
-`import scanscribe` must expose every name in `scanscribe.__all__` without importing `paddle`,
-`paddleocr` or `scanscribe.paddle_engine`.
-- **Given** a fresh interpreter, **when** it runs `from scanscribe import *`, **then** every name
-  in `__all__` is bound and none of those three modules is in `sys.modules`.
+`scanscribe.__all__` must equal the list in D2. `from scanscribe import *` must never import
+`paddle`, `paddleocr` or `scanscribe.paddle_engine`.
+- **Given** a fresh interpreter, **when** it runs `from scanscribe import *`, **then** `sorted(__all__)` equals D2's list, every name is bound, and none of the three modules is in `sys.modules`.
 
-### R8 · The wheel is typed
+### R10 · The wheel is typed
 
 The built wheel must contain `scanscribe/py.typed`.
-- **Given** `uv build`, **when** the wheel's file list is read, **then** it includes
-  `scanscribe/py.typed`.
+- **Given** `uv build`, **when** the wheel's file list is read, **then** it includes `scanscribe/py.typed`.
 
 ## Decisions
 
 ### D1 · Two functions: `ocr_source` for control, `transcribe` for convenience
 
-`ocr_source(source, engine, columns, on_page)` is the loop now in `cli.convert()` and returns
-the pages' lines. `transcribe(path, engine, *, dpi, columns, on_page)` opens the source, runs
-`ocr_source` and returns `format_pages(...)`. The CLI uses `ocr_source`, because it must open the
-source before it loads the engine (the check-first rule). A server with a loaded engine calls
-`transcribe`. Cancelling means raising from `on_page`, so no separate cancel token is needed.
-Rejected: one `transcribe` that takes an engine factory (it hides the loaded-engine reuse a server
-needs); a cancel-event argument (it's a second way to do what raising already does).
+- `ocr_source(source, engine, on_page=None) -> list[list[str]]` is the loop now in
+  `cli.convert()`. It returns each page's lines.
+- `transcribe(path, engine, *, dpi=200, columns=1, on_page=None) -> str` opens the source with
+  `with`, runs `ocr_source` and returns `format_pages(...)`.
+
+The CLI calls `open_source`, then loads the engine, then calls `ocr_source`, keeping the
+check-first rule. Its `on_page` prints `Processing page N...`, the line it prints today at the
+same point. Cancelling means raising from `on_page`. Rejected: a `transcribe` that takes an engine
+factory (it hides the engine reuse a server needs); a cancel-event argument (a second way to do
+what raising already does); a `columns` argument on `ocr_source` (it could differ from the
+checked one, F2).
 
 ### D2 · The public API is `__all__` in `scanscribe/__init__.py`, typed with `py.typed`
 
-`__init__.py` re-exports the public names from `api`, `engine`, `pages` and `output`, so callers
-write `from scanscribe import transcribe`. `py.typed` lets the MCP repo's strict mypy check calls
-against it. Rejected: a separate `scanscribe.api` namespace as the only entry point (longer
-imports, with no gain); leaving it untyped (the MCP repo would need `ignore_missing_imports`).
+`__all__` holds exactly these names:
+- from `api`: `transcribe`, `ocr_source`, `ProgressCallback`;
+- from `pages`: `open_source`, `PageSource`, `IMAGE_EXTENSIONS`;
+- from `output`: `format_pages`;
+- from `engine`: `load_engine`, `OcrEngine`, `PageImage`, `EngineFactory`, `ScanscribeError`,
+  `UsageError`, `InputError`, `EngineMissingError`.
+
+`__version__` stays a module attribute. `py.typed` lets the MCP repo's strict mypy check calls.
+Rejected: also exporting `split_columns`, `natural_key` or `write_atomic` (no stated need, and each
+would be frozen by semver); a `scanscribe.api`-only entry point (longer imports, no gain).
 
 ### D3 · The MCP server lives in a separate repository
 
 `scanscribe-mcp` depends on this package through a pinned Git tag. mcp-service-kit needs Python
-3.11 or later, while scanscribe supports 3.10. The server also brings its own dependencies
-(FastMCP, Starlette), a different security model and a Docker deployment. Rejected: an `mcp`
-extra in this repository (Python markers, two test setups in CI, and server dependencies in the
-CLI's lock file). It costs a tag per API change, and the dependent project must repeat the Paddle
-index and `conflicts` settings, because uv doesn't inherit `[tool.uv.sources]` from a dependency.
+3.11 or later, while scanscribe supports 3.10. The server also brings FastMCP and Starlette, a
+different security model and a Docker deployment. Rejected: an `mcp` extra in this repository. It
+would need Python-version markers, CI on two setups, and server packages in the CLI's lock file.
+The cost of this choice: each API change needs a new tag, and the MCP repo must copy the Paddle
+install settings, because uv doesn't inherit `[tool.uv.sources]` from a dependency.
+
+### D4 · Argument and path checks live in `open_source`
+
+`open_source` checks `columns` and `dpi` (R5) and the input path (R6), turning `OSError` and
+`RuntimeError` from the path check into `UsageError`, as `cli.resolve_output` does. The CLI keeps
+its own earlier checks (argparse, `resolve_output`), so its messages and exit codes don't change;
+the new checks never fire from the CLI. Rejected: checks in `transcribe` only (`open_source` is
+public too, and `dpi=0` today gives a zero scale).
 
 ## Assumptions
 
 - uv_build includes every file in `src/scanscribe/`, so `py.typed` reaches the wheel with no
-  config. Task 1.3 checks this.
-- The version stays `0.1.0`. Nothing has been tagged or published, so the first tag can carry the
+  config. Task 1.3 checks this by hand; no automated test covers it.
+- The version stays `0.1.0`. Nothing has been tagged or published, so the first tag carries the
   API.
-- R5's checks repeat argparse's `--columns`/`--dpi` check and the CLI's input path check. The CLI still checks first, so its messages and exit codes don't change.
+- One process runs one OCR job at a time. The real engine swaps the process-wide `sys.stdout` for
+  stderr while it runs, and pdfium isn't safe to call from two threads. README says so, and the
+  scanscribe-mcp plan must run jobs one at a time per process.
+- The folder pre-check decodes every image before the first `on_page` call, so a large folder has
+  no progress or cancel until it finishes. The scanscribe-mcp plan handles that wait.
 
 ## Risks
 
-- The refactor changes CLI output or the check-first order → every existing `test_cli.py` test runs
-  unchanged. R1 compares the library and the CLI directly.
-- A later change breaks the public API without notice → `__all__` plus R7's test make the surface
-  explicit; README states the semver promise.
-- The MCP repo's pinned copy of the Paddle install settings drifts from this repo's → README
-  documents the settings to copy (D3).
+- The refactor changes CLI output or the check-first order → every `test_cli.py` test runs
+  unchanged, and R1 compares library and CLI output directly.
+- A later change breaks the public API silently → R9's test pins `__all__` to D2's list.
+- The MCP repo's copy of the Paddle install settings drifts from this repo's → README lists the
+  settings to copy (D3).
 
 ## Rollout & rollback
 
 Merge, then the owner tags `v0.1.0` on the merge commit:
-`git tag v0.1.0 <merge-sha> && git push origin v0.1.0`. Rollback is a revert of the PR. No one
-depends on the API before the tag exists. The `study-book-chapter` skill reads the CLI's output
-file, which doesn't change.
+`git tag v0.1.0 <merge-sha> && git push origin v0.1.0`. Before the tag, rollback is a PR revert.
+After it, a pushed tag is never moved: a fix ships as `v0.1.1`. Later API changes get a new tag
+following semver. The `study-book-chapter` skill (it turns the CLI's text output into a study
+guide) reads the output file, which doesn't change.
 
 ## Open questions
 
@@ -189,7 +229,7 @@ file, which doesn't change.
 ## Impact
 
 - Packages / directories: `src/scanscribe/` (new `api.py` and `py.typed`; `__init__.py`,
-  `cli.py`, `engine.py`), `tests/`, `README.md`, `docs/decision-log.md`
+  `cli.py`, `engine.py`, `pages.py`), `tests/`, `README.md`, `docs/decision-log.md`
 - Data: none
 - Jobs / APIs: the new Python API; the `scanscribe` command is unchanged
 
@@ -198,14 +238,16 @@ file, which doesn't change.
 - Issue [#9](https://github.com/geosp/scanscribe/issues/9) — this work
 - [ADR-0001](../../adrs/0001-ocr-engine-behind-an-interface.md) — the OCR engine sits behind a
   one-method interface and Paddle is imported only when OCR starts; this API keeps both
-- [rebuild-cli plan](../2026-11-16-rebuild-cli/plan.md) — the CLI's requirements, which stay
-  unchanged
-- [pandoc-mcp](https://github.com/geosp/pandoc-mcp) — the layout the MCP server will follow
+- [mcp-service-kit](https://github.com/geosp/mcp-service-kit) and
+  [pandoc-mcp](https://github.com/geosp/pandoc-mcp) — the base library and the layout the MCP
+  server will follow
 
 ## Phases
 
 | Phase | Title | Status | Tasks |
 | --- | --- | --- | --- |
-| 01 | [Library API and CLI on top of it](phases/01-library-api.md) | draft | 0/8 |
+| 01 | [Library API and CLI on top of it](phases/01-library-api.md) | draft | 0/9 |
 
 ## Decision log
+
+<!-- One dated line per change made after approval. -->
