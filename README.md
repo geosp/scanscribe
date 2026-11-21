@@ -4,7 +4,7 @@ OCR scanned PDFs and folders of page images (for example, phone or Kindle screen
 
 ## Install
 
-Requires [uv](https://docs.astral.sh/uv/) and Python 3.10 to 3.12. Install exactly one OCR engine build:
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.11 to 3.12. Install exactly one OCR engine build:
 
 ```bash
 uv sync --extra gpu   # NVIDIA GPU, CUDA 12.6+ driver (Linux or Windows, x86_64)
