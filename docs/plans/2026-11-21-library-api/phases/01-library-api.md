@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: Library API and CLI on top of it
-status: impl-reviewed
+status: done
 branch: feat/9-library-api
 base: 49ecda09ad69340c5f02e869c0e0f7bca725aa27
 delivers: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10]
@@ -53,6 +53,6 @@ every existing test passes unchanged, and the README documents the API.
   `__all__`.
 - [x] 3.2 `docs/decision-log.md`: one line for the public API and the separate MCP repo (D3).
   Verify: the line links this plan.
-- [ ] 3.3 Run every check in AGENTS.md, then a manual run on the GPU machine with `--extra gpu`:
+- [x] 3.3 Run every check in AGENTS.md, then a manual run on the GPU machine with `--extra gpu`:
   `transcribe` on a small self-made PDF equals `uv run scanscribe` on it. Record the device.
   Verify: all checks pass; the device and result are noted in the PR.

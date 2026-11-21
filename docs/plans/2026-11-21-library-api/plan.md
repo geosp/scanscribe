@@ -1,6 +1,6 @@
 ---
 title: A public library API for scanscribe
-status: in-progress
+status: implemented
 created: 2026-11-21
 updated: 2026-11-21
 design_review: { status: passed, rounds: 1, last: 2026-11-21 }
@@ -246,7 +246,7 @@ guide) reads the output file, which doesn't change.
 
 | Phase | Title | Status | Tasks |
 | --- | --- | --- | --- |
-| 01 | [Library API and CLI on top of it](phases/01-library-api.md) | in-progress | 8/9 |
+| 01 | [Library API and CLI on top of it](phases/01-library-api.md) | done | 9/9 |
 
 ## Decision log
 
